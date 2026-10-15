@@ -19,6 +19,7 @@
   --bg:#0F121A; --surface:#171B26; --ink:#E5E8F1; --muted:#9AA2B6; --line:#2A3042;
   --accent:#8FA5FF; --accent-ink:#0F121A; --brass:#D8A748; --ok:#5DC98B; --bad:#F07C71; --soft:#202637; color-scheme:dark}
 
+*,*::before,*::after{box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -68,8 +69,14 @@ textarea{font-family:var(--f-mono);font-size:.78rem;min-height:90px}
 
 /* Palace */
 .locus{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:8px;align-items:center}
-.lbtns{display:flex;gap:4px}
-.btn.mv{padding:6px 9px;font-size:.7rem;line-height:1.2}
+.locus{grid-template-columns:28px 26px minmax(0,1fr) auto!important;border-radius:8px;transition:background .15s}
+.grip{appearance:none;border:0;background:transparent;width:28px;height:36px;display:grid;place-items:center;cursor:grab;touch-action:none;border-radius:6px;padding:0}
+.grip:hover{background:var(--soft)}
+.grip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.grip span{width:16px;height:12px;background:linear-gradient(var(--muted),var(--muted)) 0 0/100% 2px no-repeat,linear-gradient(var(--muted),var(--muted)) 0 50%/100% 2px no-repeat,linear-gradient(var(--muted),var(--muted)) 0 100%/100% 2px no-repeat}
+.sorting,.sorting *{cursor:grabbing!important;user-select:none}
+.locus.dragging{background:var(--soft);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.locus.dragging .grip span{background:linear-gradient(var(--accent),var(--accent)) 0 0/100% 2px no-repeat,linear-gradient(var(--accent),var(--accent)) 0 50%/100% 2px no-repeat,linear-gradient(var(--accent),var(--accent)) 0 100%/100% 2px no-repeat}
 .pin{font-family:var(--f-mono);font-size:.78rem;color:var(--brass);font-weight:600;text-align:right}
 .tips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .tip{background:var(--soft);border-radius:8px;padding:10px 12px;font-size:.88rem}
@@ -491,7 +498,7 @@ function renderPalacio(){
       e.preventDefault();
       var row = g.closest(".locus");
       row.classList.add("dragging"); list.classList.add("sorting");
-      try{ g.setPointerCapture(e.pointerId); }catch(err){}
+      var pid = e.pointerId, ended = false;
       var lastY = e.clientY, scrollTimer = null;
       function place(y){
         var rows = Array.prototype.slice.call(list.querySelectorAll(".locus"));
@@ -508,10 +515,12 @@ function renderPalacio(){
         if(lastY < m) window.scrollBy(0, -8); else if(lastY > v - m) window.scrollBy(0, 8); else return;
         place(lastY);
       }
-      function onMove(ev){ lastY = ev.clientY; place(lastY); }
-      function onUp(){
+      function onMove(ev){ if(ev.pointerId!==pid) return; ev.preventDefault(); lastY = ev.clientY; place(lastY); }
+      function onUp(ev){
+        if(ev && ev.pointerId!==pid) return;
+        if(ended) return; ended = true;
         clearInterval(scrollTimer);
-        g.removeEventListener("pointermove", onMove); g.removeEventListener("pointerup", onUp); g.removeEventListener("pointercancel", onUp);
+        document.removeEventListener("pointermove", onMove); document.removeEventListener("pointerup", onUp); document.removeEventListener("pointercancel", onUp);
         var order = Array.prototype.map.call(list.querySelectorAll(".locus"), function(r){ return +r.getAttribute("data-i"); });
         var newIdx = order.indexOf(+row.getAttribute("data-i"));
         p.loci = order.map(function(k){ return p.loci[k]; });
@@ -519,7 +528,7 @@ function renderPalacio(){
         var ng = view.querySelector('[data-grip="'+newIdx+'"]'); if(ng) ng.focus({preventScroll:true});
       }
       scrollTimer = setInterval(edgeScroll, 16);
-      g.addEventListener("pointermove", onMove); g.addEventListener("pointerup", onUp); g.addEventListener("pointercancel", onUp);
+      document.addEventListener("pointermove", onMove, {passive:false}); document.addEventListener("pointerup", onUp); document.addEventListener("pointercancel", onUp);
     });
   });
   document.getElementById("addLoc").onclick = function(){ p.loci.push(""); save(); renderPalacio(); var ins=view.querySelectorAll("[data-li]"); ins[ins.length-1].focus(); };
