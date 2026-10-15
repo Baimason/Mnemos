@@ -451,10 +451,9 @@ function renderPalacio(){
   h += '<h3 style="margin-top:6px">Recorrido</h3><p class="small muted">Ordena los lugares como si caminaras por el sitio. Siempre en la misma dirección. Lugares distintos entre sí funcionan mejor que cinco sillas iguales.</p>';
   h += '<div style="display:flex;flex-direction:column;gap:6px" id="lociList">';
   p.loci.forEach(function(x,i){
-    h += '<div class="locus"><span class="pin">'+pad2(i+1)+'</span><input data-li="'+i+'" value="'+esc(x)+'" placeholder="Lugar '+(i+1)+'">'
-      + '<div class="lbtns"><button class="btn small ghost mv" data-up="'+i+'" aria-label="Subir lugar"'+(i===0?' disabled':'')+'>&#9650;</button>'
-      + '<button class="btn small ghost mv" data-down="'+i+'" aria-label="Bajar lugar"'+(i===p.loci.length-1?' disabled':'')+'>&#9660;</button>'
-      + '<button class="btn small ghost" data-del="'+i+'" aria-label="Quitar lugar">Quitar</button></div></div>';
+    h += '<div class="locus" data-i="'+i+'"><button class="grip" data-grip="'+i+'" aria-label="Arrastrar para reordenar. Flechas arriba y abajo para mover." title="Arrastra para reordenar"><span></span></button>'
+      + '<span class="pin">'+pad2(i+1)+'</span><input data-li="'+i+'" value="'+esc(x)+'" placeholder="Lugar '+(i+1)+'">'
+      + '<button class="btn small ghost" data-del="'+i+'" aria-label="Quitar lugar">Quitar</button></div>';
   });
   h += '</div><div class="row"><button class="btn small" id="addLoc">Añadir lugar</button><button class="btn small" id="add5">Añadir 5</button></div>';
   if(S.palaces.length>1){
@@ -479,11 +478,50 @@ function renderPalacio(){
   function move(i, d){
     var j = i + d; if(j<0 || j>=p.loci.length) return;
     var t = p.loci[i]; p.loci[i] = p.loci[j]; p.loci[j] = t; save(); renderPalacio();
-    var btn = view.querySelector('[data-'+(d<0?'up':'down')+'="'+j+'"]');
-    if(btn && !btn.disabled) btn.focus(); else { var inp = view.querySelector('[data-li="'+j+'"]'); if(inp) inp.focus(); }
+    var g = view.querySelector('[data-grip="'+j+'"]'); if(g) g.focus();
   }
-  view.querySelectorAll("[data-up]").forEach(function(b){ b.onclick = function(){ move(+b.getAttribute("data-up"), -1); }; });
-  view.querySelectorAll("[data-down]").forEach(function(b){ b.onclick = function(){ move(+b.getAttribute("data-down"), 1); }; });
+  var list = document.getElementById("lociList");
+  view.querySelectorAll("[data-grip]").forEach(function(g){
+    g.addEventListener("keydown", function(e){
+      if(e.key==="ArrowUp"){ e.preventDefault(); move(+g.getAttribute("data-grip"), -1); }
+      else if(e.key==="ArrowDown"){ e.preventDefault(); move(+g.getAttribute("data-grip"), 1); }
+    });
+    g.addEventListener("pointerdown", function(e){
+      if(e.button!==undefined && e.button!==0) return;
+      e.preventDefault();
+      var row = g.closest(".locus");
+      row.classList.add("dragging"); list.classList.add("sorting");
+      try{ g.setPointerCapture(e.pointerId); }catch(err){}
+      var lastY = e.clientY, scrollTimer = null;
+      function place(y){
+        var rows = Array.prototype.slice.call(list.querySelectorAll(".locus"));
+        var others = rows.filter(function(r){ return r!==row; });
+        var idx = 0;
+        others.forEach(function(r){ var b = r.getBoundingClientRect(); if(y > b.top + b.height/2) idx++; });
+        if(rows.indexOf(row) !== idx){
+          list.insertBefore(row, others[idx] || null);
+          list.querySelectorAll(".locus .pin").forEach(function(pn,k){ pn.textContent = pad2(k+1); });
+        }
+      }
+      function edgeScroll(){
+        var m = 70, v = window.innerHeight;
+        if(lastY < m) window.scrollBy(0, -8); else if(lastY > v - m) window.scrollBy(0, 8); else return;
+        place(lastY);
+      }
+      function onMove(ev){ lastY = ev.clientY; place(lastY); }
+      function onUp(){
+        clearInterval(scrollTimer);
+        g.removeEventListener("pointermove", onMove); g.removeEventListener("pointerup", onUp); g.removeEventListener("pointercancel", onUp);
+        var order = Array.prototype.map.call(list.querySelectorAll(".locus"), function(r){ return +r.getAttribute("data-i"); });
+        var newIdx = order.indexOf(+row.getAttribute("data-i"));
+        p.loci = order.map(function(k){ return p.loci[k]; });
+        save(); renderPalacio();
+        var ng = view.querySelector('[data-grip="'+newIdx+'"]'); if(ng) ng.focus({preventScroll:true});
+      }
+      scrollTimer = setInterval(edgeScroll, 16);
+      g.addEventListener("pointermove", onMove); g.addEventListener("pointerup", onUp); g.addEventListener("pointercancel", onUp);
+    });
+  });
   document.getElementById("addLoc").onclick = function(){ p.loci.push(""); save(); renderPalacio(); var ins=view.querySelectorAll("[data-li]"); ins[ins.length-1].focus(); };
   document.getElementById("add5").onclick = function(){ for(var i=0;i<5;i++) p.loci.push(""); save(); renderPalacio(); };
   document.getElementById("newPal").onclick = function(){ var id="p"+Date.now(); S.palaces.push({id:id,name:"Palacio "+(S.palaces.length+1),loci:["","","","","","","","","",""]}); S.active=id; palConfirm=false; save(); renderPalacio(); };
