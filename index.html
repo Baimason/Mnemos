@@ -1,0 +1,748 @@
+<title>Mnemos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: single study column like a training notebook; tabs as rooms of the palace, brass markers for loci */
+:root{
+  --bg:#ECEEF3; --surface:#F9FAFC; --ink:#161A25; --muted:#5B6274; --line:#D3D8E2;
+  --accent:#2C4CCB; --accent-ink:#FFFFFF; --brass:#A87A22; --ok:#2B7A4B; --bad:#B23A30;
+  --soft:#E1E5EF;
+  --f-display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F121A; --surface:#171B26; --ink:#E5E8F1; --muted:#9AA2B6; --line:#2A3042;
+  --accent:#8FA5FF; --accent-ink:#0F121A; --brass:#D8A748; --ok:#5DC98B; --bad:#F07C71; --soft:#202637; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F121A; --surface:#171B26; --ink:#E5E8F1; --muted:#9AA2B6; --line:#2A3042;
+  --accent:#8FA5FF; --accent-ink:#0F121A; --brass:#D8A748; --ok:#5DC98B; --bad:#F07C71; --soft:#202637; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:720px;margin:0 auto;padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:750;font-size:2.1rem;letter-spacing:-.02em;margin:0;line-height:1}
+h1 span{color:var(--brass)}
+.sub{color:var(--muted);font-size:.85rem}
+h2{font-family:var(--f-display);font-weight:600;font-size:1.35rem;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0;font-weight:600}
+p{margin:0}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:500 .9rem var(--f-body);
+  padding:10px 12px;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.view{display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .92rem var(--f-body);
+  padding:10px 16px;border-radius:8px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.small{padding:6px 10px;font-size:.82rem}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:default}
+input[type=text],input:not([type]),select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;min-width:0;width:100%}
+textarea{font-family:var(--f-mono);font-size:.78rem;min-height:90px}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* Today */
+.daybar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--f-display);font-size:1.7rem;font-weight:750;line-height:1.1}
+.meter{height:6px;background:var(--soft);border-radius:4px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.blocks{display:flex;flex-direction:column;gap:0}
+.block{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.block:first-child{border-top:0}
+.check{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center}
+.check.done{background:var(--ok);border-color:var(--ok)}
+.check.done::after{content:"";width:6px;height:10px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.phase{border-left:3px solid var(--brass);padding-left:12px;display:flex;flex-direction:column;gap:4px}
+
+/* Palace */
+.locus{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:8px;align-items:center}
+.lbtns{display:flex;gap:4px}
+.btn.mv{padding:6px 9px;font-size:.7rem;line-height:1.2}
+.pin{font-family:var(--f-mono);font-size:.78rem;color:var(--brass);font-weight:600;text-align:right}
+.tips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tip{background:var(--soft);border-radius:8px;padding:10px 12px;font-size:.88rem}
+.tip b{display:block;font-size:.82rem}
+
+/* Drill */
+.stage{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 8px}
+.stage .where{font-family:var(--f-mono);color:var(--brass);font-size:.8rem;letter-spacing:.06em;text-transform:uppercase}
+.stage .locusname{font-size:1.05rem;color:var(--muted)}
+.stage .word{font-family:var(--f-display);font-weight:750;font-size:clamp(2rem,9vw,3.2rem);line-height:1.05;letter-spacing:-.02em;overflow-wrap:anywhere}
+.timer{width:100%;max-width:360px;height:4px;background:var(--soft);border-radius:3px;overflow:hidden}
+.timer i{display:block;height:100%;background:var(--brass);width:100%}
+.recall{display:flex;flex-direction:column;gap:8px}
+.rline{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:8px;align-items:center}
+.rline label{font-size:.85rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rline .ins{display:flex;gap:6px;min-width:0}
+.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 20px;gap:8px;font-size:.9rem;padding:6px 0;border-top:1px solid var(--line)}
+.res .ok{color:var(--ok)} .res .bad{color:var(--bad)}
+.digits{font-family:var(--f-mono);font-weight:600;font-size:clamp(1.4rem,6.5vw,2rem);letter-spacing:.04em;display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-variant-numeric:tabular-nums}
+.digits span.x{color:var(--bad);text-decoration:underline}
+.big{font-family:var(--f-display);font-weight:750;font-size:2.6rem;line-height:1}
+
+/* Major system */
+.ref{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.ref div{background:var(--soft);border-radius:7px;padding:6px;text-align:center;font-size:.82rem}
+.ref b{display:block;font-family:var(--f-mono);font-size:1.1rem;color:var(--brass)}
+.grid100{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.cell{display:grid;grid-template-columns:28px minmax(0,1fr);gap:6px;align-items:center}
+.cell span{font-family:var(--f-mono);font-size:.85rem;color:var(--muted);text-align:right}
+.cell input{padding:6px 8px;font-size:.88rem}
+.card{display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 8px;text-align:center}
+
+/* Progress */
+.chartbox{overflow-x:auto}
+svg text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.legend{display:flex;gap:14px;font-size:.82rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.toast{font-size:.85rem;color:var(--ok)}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.88rem}
+
+.hdr-r{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+/* Guide */
+.prose{display:flex;flex-direction:column;gap:12px;max-width:65ch}
+.prose p,.prose li{line-height:1.65}
+.prose ol,.prose ul{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
+.toc{display:flex;flex-wrap:wrap;gap:6px}
+.toc a{font-size:.82rem;color:var(--ink);text-decoration:none;background:var(--soft);padding:5px 10px;border-radius:20px}
+.toc a:hover{background:var(--line)}
+.walk{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.walk div{display:grid;grid-template-columns:2.2rem minmax(0,9rem) minmax(0,1fr);gap:10px;padding:10px 12px;border-top:1px solid var(--line);font-size:.9rem;align-items:baseline}
+.walk div:first-child{border-top:0}
+.walk .pin{text-align:left}
+.walk b{font-weight:600}
+.quote{border-left:3px solid var(--brass);padding-left:12px;color:var(--muted);font-style:italic}
+.qa{display:flex;flex-direction:column;gap:4px}
+.qa b{font-weight:600}
+@media (max-width:520px){
+  .walk div{grid-template-columns:2rem minmax(0,1fr)}
+  .walk div span:last-child{grid-column:2}
+  .hdr-r{align-items:flex-start;flex-direction:row;flex-wrap:wrap}
+  .tips{grid-template-columns:1fr}
+  .rline{grid-template-columns:1fr}
+  .daybar .stat b{font-size:1.4rem}
+  h1{font-size:1.8rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Mnemos<span>.</span></h1>
+      <div class="sub" id="hdrsub">Entrenamiento diario de memoria</div>
+    </div>
+    <div class="hdr-r"><div class="sub mono" id="hdrday"></div><button class="btn small" id="syncBtn">Guardar / recuperar</button></div>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="hoy">Hoy</button>
+    <button class="tab" role="tab" data-tab="guia">Guía</button>
+    <button class="tab" role="tab" data-tab="palacio">Palacio</button>
+    <button class="tab" role="tab" data-tab="palabras">Palabras</button>
+    <button class="tab" role="tab" data-tab="numeros">Números</button>
+    <button class="tab" role="tab" data-tab="mayor">Sistema mayor</button>
+    <button class="tab" role="tab" data-tab="progreso">Progreso</button>
+  </nav>
+  <main id="view"></main>
+</div>
+
+<script>
+(function(){
+"use strict";
+var KEY = "mnemos.v1";
+
+var WORDS = ("manzana,elefante,guitarra,cohete,paraguas,pingüino,tijeras,volcán,camello,trompeta,sandía,martillo,ballena,corona,tractor,mariposa,cebolla,pirata,escalera,tiburón,helicóptero,zapato,dragón,reloj,canguro,bombilla,cactus,pulpo,espada,globo,tortuga,piano,limón,robot,ancla,jirafa,maleta,fresa,caballo,telescopio,hamburguesa,murciélago,cuchara,castillo,león,bicicleta,sombrero,pizza,cocodrilo,llave,payaso,pelota,serpiente,micrófono,nube,yunque,gorila,taladro,mono,cangrejo,brócoli,bufanda,ardilla,iglú,tambor,aguacate,faro,lámpara,vaca,anillo,huevo,camión,abeja,bota,cereza,dinosaurio,dado,hacha,bruja,imán,koala,lápiz,mapache,nariz,oso,pato,queso,rana,sirena,tren,unicornio,vampiro,zanahoria,ataúd,botella,calabaza,diamante,estrella,flamenco,gallina,hormiga,jabón,loro,momia,naranja,olla,rueda,salchicha,tenedor,uva,vela,yogur,zorro,avión,barco,candado,escoba,fantasma,gusano,helado,isla,jaula,kiwi,lobo,medusa,nido,oveja,perro,ratón,sartén,tigre,ventilador,xilófono,yate,cebra,ajo,búho,cadena,delfín,erizo,foca,granada,hielo,jamón,ladrillo,mago,ninja,ornitorrinco,pan,rinoceronte,sapo,tomate,vikingo,yoyó,trompo,submarino,cometa,brújula,pelícano,tostadora,plátano,muñeco,linterna,caracol").split(",");
+
+var EXAMPLE_LOCI = ["Puerta de entrada","Alfombra","Sofá","Televisor","Mesa del comedor","Refrigerador","Fregadero","Ducha","Espejo del baño","Cama"];
+
+var PHASES = [
+  {w:1, t:"Semana 1: tu primer palacio", d:"Recorre tu palacio de ejemplo o crea uno propio con 10 lugares que conozcas de memoria. Dos rondas de palabras al día. La meta es que las imágenes sean absurdas y con movimiento."},
+  {w:2, t:"Semana 2: segundo palacio y tabla", d:"Arma un segundo palacio de 20 lugares. Empieza tu tabla del sistema mayor llenando del 00 al 29 y repásala a diario."},
+  {w:3, t:"Semanas 3 y 4: números", d:"Completa la tabla hasta el 99. Cada par de dígitos se vuelve una imagen que colocas en un lugar del palacio. Una ronda de números al día."},
+  {w:5, t:"Semanas 5 y 6: velocidad", d:"Baja los segundos por palabra (de 8 a 5) y sube la longitud. Aquí es donde el estudio de Dresler vio los saltos grandes."},
+  {w:7, t:"Mantenimiento", d:"Ya tienes el método. Úsalo con cosas reales: listas, presentaciones, vocabulario. Sigue con rondas cortas para no perder ritmo."}
+];
+
+/* ---------- storage ---------- */
+function todayStr(d){ d = d || new Date(); var y=d.getFullYear(), m=d.getMonth()+1, dd=d.getDate(); return y+"-"+(m<10?"0":"")+m+"-"+(dd<10?"0":"")+dd; }
+function addDays(s,n){ var p=s.split("-"); var d=new Date(+p[0],+p[1]-1,+p[2]); d.setDate(d.getDate()+n); return todayStr(d); }
+function daysBetween(a,b){ var pa=a.split("-"),pb=b.split("-"); return Math.round((new Date(+pb[0],+pb[1]-1,+pb[2]) - new Date(+pa[0],+pa[1]-1,+pa[2]))/86400000); }
+
+function defaults(){
+  return { v:1, start: todayStr(),
+    palaces:[{id:"p1", name:"Mi casa (ejemplo)", loci:EXAMPLE_LOCI.slice()}], active:"p1",
+    words:{level:10, secs:8, hist:[]}, nums:{level:10, hist:[]},
+    major:{t:{}, c:{}}, log:{} };
+}
+function load(){
+  try{ var r = localStorage.getItem(KEY); if(r){ var o = JSON.parse(r); var d = defaults(); for(var k in d){ if(!(k in o)) o[k]=d[k]; } return o; } }catch(e){}
+  return defaults();
+}
+var S = load();
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function dayLog(d){ d = d || todayStr(); if(!S.log[d]) S.log[d] = {min:0,w:0,n:0,m:0}; return S.log[d]; }
+function addMinutes(ms){ var l = dayLog(); l.min = Math.round((l.min + ms/60000)*10)/10; }
+
+/* ---------- helpers ---------- */
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function norm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim(); }
+function same(a,b){ a=norm(a); b=norm(b); if(!a||!b) return false; return a===b || a+"s"===b || b+"s"===a || a+"es"===b || b+"es"===a; }
+function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function palace(){ for(var i=0;i<S.palaces.length;i++) if(S.palaces[i].id===S.active) return S.palaces[i]; S.active=S.palaces[0].id; return S.palaces[0]; }
+function loci(){ return palace().loci.filter(function(x){ return norm(x); }); }
+function weekNum(){ return Math.floor(Math.max(0,daysBetween(S.start, todayStr()))/7)+1; }
+function phase(){ var w=weekNum(), p=PHASES[0]; for(var i=0;i<PHASES.length;i++) if(w>=PHASES[i].w) p=PHASES[i]; return p; }
+function streak(){
+  var d = todayStr(), n = 0;
+  function active(x){ var l=S.log[x]; return l && (l.w+l.n+l.m)>0; }
+  if(!active(d)) d = addDays(d,-1);
+  while(active(d)){ n++; d = addDays(d,-1); }
+  return n;
+}
+function majorFilled(){ var n=0; for(var k in S.major.t) if(norm(S.major.t[k])) n++; return n; }
+function pad2(i){ return (i<10?"0":"")+i; }
+
+var view = document.getElementById("view");
+var current = "hoy";
+var timerId = null;
+function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
+
+function header(){
+  document.getElementById("hdrday").textContent = "Día " + (daysBetween(S.start,todayStr())+1) + " · semana " + weekNum();
+}
+
+function go(tab){
+  stopTimer(); current = tab;
+  var tabs = document.querySelectorAll(".tab");
+  for(var i=0;i<tabs.length;i++) tabs[i].setAttribute("aria-selected", tabs[i].getAttribute("data-tab")===tab ? "true":"false");
+  header();
+  if(tab==="guia" && !S.seenGuide){ S.seenGuide = true; save(); }
+  ({hoy:renderHoy, guia:renderGuia, sync:renderSync, palacio:renderPalacio, palabras:renderPalabras, numeros:renderNumeros, mayor:renderMayor, progreso:renderProgreso})[tab]();
+  try{ localStorage.setItem(KEY+".tab", tab); }catch(e){}
+}
+document.getElementById("tabs").addEventListener("click", function(e){ var t=e.target.closest(".tab"); if(t) go(t.getAttribute("data-tab")); });
+document.getElementById("syncBtn").onclick = function(){ go("sync"); };
+
+/* ---------- GUIA ---------- */
+function renderGuia(){
+  var L = loci();
+  var ex = [
+    ["leche", "Una cascada de leche sale por debajo de la puerta y te moja los zapatos al entrar."],
+    ["pilas", "La alfombra está hecha de pilas gigantes que chispean y te dan toques al pisarla."],
+    ["llamar al dentista", "Un diente enorme está sentado en el sofá, hablando por teléfono y riéndose."]
+  ];
+  var walk = ex.map(function(e,i){ return '<div><span class="pin">'+pad2(i+1)+'</span><b>'+esc(L[i]||EXAMPLE_LOCI[i])+'</b><span>'+esc(e[1])+'</span></div>'; }).join("");
+  var h = '<section class="view">';
+  h += '<div class="panel"><div class="prose"><h2>Cómo funciona todo esto</h2><p class="muted">Una lectura de unos 5 minutos. Explica qué es la técnica, por qué funciona y qué vas a hacer cada día.</p>'
+    + '<nav class="toc"><a href="#g-que">Qué es</a><a href="#g-origen">De dónde viene</a><a href="#g-porque">Por qué funciona</a><a href="#g-como">Cómo se usa</a><a href="#g-imagenes">Buenas imágenes</a><a href="#g-numeros">Números</a><a href="#g-app">Esta app</a><a href="#g-dudas">Dudas comunes</a></nav></div></div>';
+
+  h += '<div class="panel" id="g-que"><div class="prose"><h3>Qué es</h3><h2>Un palacio de la memoria es un lugar que ya conoces, usado como estantería</h2>'
+    + '<p>La idea es simple. Tomas un sitio que conoces de memoria, como tu casa, y fijas un recorrido por él: la puerta, luego la alfombra, luego el sofá, y así. Cada punto del recorrido es un <b>lugar</b> (en latín, <i>locus</i>; por eso también se llama método de loci).</p>'
+    + '<p>Cuando quieres recordar algo, lo conviertes en una imagen exagerada y la "dejas" en uno de esos lugares. Para recordarlo después, recorres la casa en tu cabeza y vas encontrando lo que dejaste, en orden.</p>'
+    + '<p>No estás memorizando la lista. Estás memorizando escenas en un sitio que tu cerebro ya domina.</p></div></div>';
+
+  h += '<div class="panel" id="g-origen"><div class="prose"><h3>De dónde viene</h3><h2>Tiene unos 2500 años</h2>'
+    + '<p>La historia clásica cuenta que el poeta griego Simónides de Ceos salió un momento de un banquete y, mientras estaba afuera, el techo se derrumbó. Los cuerpos quedaron irreconocibles, pero Simónides pudo identificar a cada invitado recordando dónde estaba sentado. De ahí sacó la idea: la memoria se organiza mejor por lugares.</p>'
+    + '<p>Los oradores romanos como Cicerón y Quintiliano la usaban para dar discursos de horas sin notas. En la Edad Media los monjes la usaban para memorizar textos enteros. Hoy es la técnica base de casi todos los campeones de memoria.</p></div></div>';
+
+  h += '<div class="panel" id="g-porque"><div class="prose"><h3>Por qué funciona</h3><h2>Tu cerebro es malo con listas y excelente con lugares</h2>'
+    + '<p>Una lista de palabras sueltas no tiene estructura: nada conecta "leche" con "pilas". Pero tu memoria espacial es enorme y muy estable. Puedes recorrer la casa donde creciste con los ojos cerrados sin esfuerzo, aunque nunca intentaste memorizarla.</p>'
+    + '<p>El palacio aprovecha tres cosas que el cerebro hace bien por naturaleza:</p>'
+    + '<ul><li><b>Orden espacial:</b> el recorrido te da la secuencia gratis. No tienes que recordar qué iba tercero, solo qué hay en el sofá.</li>'
+    + '<li><b>Imágenes:</b> recordamos mucho mejor lo que vemos que lo que leemos.</li>'
+    + '<li><b>Lo raro:</b> lo absurdo, gracioso o exagerado llama la atención y se fija mejor que lo normal.</li></ul>'
+    + '<p>La evidencia es sólida. En 2003, Eleanor Maguire escaneó el cerebro de campeones de memoria: su estructura era normal, pero al memorizar activaban regiones de navegación espacial. En 2017, Martin Dresler entrenó a personas comunes 30 minutos al día durante 6 semanas con esta técnica y pasaron de unas 26 a más de 60 palabras recordadas. Cuatro meses después seguían cerca de ese nivel.</p></div></div>';
+
+  h += '<div class="panel" id="g-como"><div class="prose"><h3>Cómo se usa</h3><h2>Un ejemplo con tu propio palacio</h2>'
+    + '<p>Supón que tienes que recordar: leche, pilas y llamar al dentista. Así quedaría en los primeros lugares de <b>'+esc(palace().name)+'</b>:</p></div>'
+    + '<div class="walk">'+walk+'</div>'
+    + '<div class="prose"><p>Al salir del súper, cierras los ojos y caminas: abres la puerta y te mojas con leche, pisas la alfombra y te da un toque, ves el diente en el sofá. La lista vuelve sola, y en orden.</p>'
+    + '<p>Los pasos son siempre los mismos:</p>'
+    + '<ol><li><b>Fija el recorrido</b> y no lo cambies. Siempre en la misma dirección.</li>'
+    + '<li><b>Convierte cada cosa en una imagen.</b> Lo abstracto se vuelve concreto: "dentista" pasa a ser un diente.</li>'
+    + '<li><b>Ponla a interactuar con el lugar.</b> No basta con que esté ahí; tiene que aplastarlo, mojarlo o romperlo.</li>'
+    + '<li><b>Recorre el palacio para recordar.</b> Ve lugar por lugar, sin saltar.</li></ol></div></div>';
+
+  h += '<div class="panel" id="g-imagenes"><div class="prose"><h3>Buenas imágenes</h3><h2>Si la imagen es aburrida, se olvida</h2>'
+    + '<p>Casi todos los fallos vienen de imágenes débiles. Lo que funciona:</p>'
+    + '<ul><li><b>Exagera el tamaño o la cantidad.</b> No una manzana, sino una del tamaño de un carro, o mil manzanas.</li>'
+    + '<li><b>Dale movimiento.</b> Que explote, gire, corra o se derrita.</li>'
+    + '<li><b>Usa los otros sentidos.</b> El olor de la leche agria, el ruido de la chispa.</li>'
+    + '<li><b>Hazla personal o absurda.</b> Tu perro con sombrero recuerda más que "un sombrero".</li>'
+    + '<li><b>Dedica 3 a 5 segundos a cada una.</b> No hace falta más, pero sí verla de verdad.</li></ul>'
+    + '<p class="quote">No necesitas "ver" la imagen como una foto. Mucha gente no visualiza con nitidez y la técnica igual funciona: lo que importa es la escena y la conexión con el lugar, no la definición.</p></div></div>';
+
+  h += '<div class="panel" id="g-numeros"><div class="prose"><h3>Números</h3><h2>El sistema mayor convierte números en cosas</h2>'
+    + '<p>Los números son difíciles de imaginar: "47" no tiene forma. El sistema mayor asigna un sonido de consonante a cada dígito (1 es t o d, 4 es r, 7 es c dura o k, y así), y las vocales se rellenan libremente. Con eso, 47 se vuelve <b>roca</b> y 31 se vuelve <b>mate</b>.</p>'
+    + '<p>La idea es armar una tabla fija del 00 al 99 con una palabra para cada número, y repasarla hasta que sea automática. Después, para memorizar 4731 piensas en una roca dentro de un mate gigante, puesta en tu sofá. Así se memorizan números de teléfono, fechas o cientos de dígitos.</p></div></div>';
+
+  h += '<div class="panel" id="g-app"><div class="prose"><h3>Esta app</h3><h2>Qué vas a hacer cada día</h2>'
+    + '<ul><li><b>Hoy:</b> te dice qué toca según la semana y cuántos minutos llevas. Lo obligatorio ocupa poco; el resto es opcional.</li>'
+    + '<li><b>Palacio:</b> donde armas y ordenas tus recorridos.</li>'
+    + '<li><b>Palabras:</b> te muestra palabras una por una en cada lugar. Luego escribes lo que recuerdes, en orden.</li>'
+    + '<li><b>Números:</b> lo mismo con dígitos, usando tu tabla del sistema mayor.</li>'
+    + '<li><b>Sistema mayor:</b> donde llenas tu tabla del 00 al 99 y la repasas con tarjetas.</li>'
+    + '<li><b>Progreso:</b> tus gráficas y récords.</li></ul>'
+    + '<p>La dificultad se ajusta sola: si aciertas el 90% o más subes de nivel, y si bajas del 60% retrocedes un poco para consolidar. El plan dura 6 semanas, igual que el estudio de Dresler: palabras primero, luego la tabla, luego números y al final velocidad.</p></div></div>';
+
+  h += '<div class="panel" id="g-dudas"><div class="prose"><h3>Dudas comunes</h3>'
+    + '<div class="qa"><b>¿Si reuso el palacio, no se mezclan las listas?</b><p>Un poco, al principio. Las imágenes viejas se desvanecen en uno o dos días. Si te molesta, alterna entre dos palacios.</p></div>'
+    + '<div class="qa"><b>¿Cuántos lugares necesito?</b><p>Empieza con 10. Para la semana 2, unos 20, idealmente en dos palacios distintos. Los campeones tienen cientos, pero no hace falta.</p></div>'
+    + '<div class="qa"><b>¿Esto mejora mi memoria en general?</b><p>No exactamente. Te vuelve muy bueno usando este método. La ganancia real viene cuando lo aplicas a cosas tuyas: listas, presentaciones, vocabulario de idiomas, contraseñas, pasos de un proceso.</p></div>'
+    + '<div class="qa"><b>¿Y si un día no puedo entrenar?</b><p>No pasa nada. La racha se corta, pero el método no se pierde. Volver al día siguiente importa más que no fallar nunca.</p></div>'
+    + '</div><div class="row"><button class="btn primary" data-go="palacio">Armar mi palacio</button><button class="btn" data-go="hoy">Volver a Hoy</button></div></div>';
+  h += '</section>';
+  view.innerHTML = h;
+  view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
+  view.querySelectorAll(".toc a").forEach(function(a){ a.onclick = function(e){ e.preventDefault(); var t = document.getElementById(a.getAttribute("href").slice(1)); if(t) t.scrollIntoView({behavior:"smooth", block:"start"}); }; });
+}
+
+/* ---------- SYNC ---------- */
+function encodeState(){ return "MNEMOS1:" + btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }
+function decodeState(code){
+  code = String(code||"").trim().replace(/\s+/g,"");
+  if(code.indexOf("MNEMOS1:")===0) code = code.slice(8);
+  var o = JSON.parse(decodeURIComponent(escape(atob(code))));
+  if(!o || !o.palaces || !o.words) throw new Error("bad");
+  return o;
+}
+function filledCount(p){ return p.loci.filter(function(z){ return norm(z); }).length; }
+function mergeState(a, b){
+  var out = JSON.parse(JSON.stringify(a));
+  if(b.start && b.start < out.start) out.start = b.start;
+  out.seenGuide = !!(a.seenGuide || b.seenGuide);
+  b.palaces.forEach(function(pb){
+    var i = -1; out.palaces.forEach(function(pa,k){ if(pa.id===pb.id) i=k; });
+    if(i<0) out.palaces.push(pb);
+    else if(filledCount(pb) > filledCount(out.palaces[i]) || (out.palaces[i].name.indexOf("(ejemplo)")>=0 && pb.name.indexOf("(ejemplo)")<0)) out.palaces[i] = pb;
+  });
+  function mergeHist(x, y){
+    var seen = {}, res = [];
+    x.concat(y).forEach(function(h){ var k = JSON.stringify(h); if(!seen[k]){ seen[k]=1; res.push(h); } });
+    res.sort(function(p,q){ return (p.ts||0)-(q.ts||0) || (p.d<q.d?-1:p.d>q.d?1:0); });
+    return res;
+  }
+  out.words.hist = mergeHist(a.words.hist, b.words.hist);
+  out.nums.hist = mergeHist(a.nums.hist, b.nums.hist);
+  out.words.level = Math.max(a.words.level, b.words.level);
+  out.nums.level = Math.max(a.nums.level, b.nums.level);
+  var bt = (b.major && b.major.t) || {}, bc = (b.major && b.major.c) || {};
+  for(var k in bt){ if(!norm(out.major.t[k]) && norm(bt[k])) out.major.t[k] = bt[k]; }
+  for(var c in bc){ var oc = out.major.c[c]; if(!oc || bc[c].due > oc.due) out.major.c[c] = bc[c]; }
+  for(var d in (b.log||{})){
+    var ol = out.log[d] || {min:0,w:0,n:0,m:0}, bl = b.log[d];
+    out.log[d] = {min:Math.max(ol.min,bl.min||0), w:Math.max(ol.w,bl.w||0), n:Math.max(ol.n,bl.n||0), m:Math.max(ol.m,bl.m||0)};
+  }
+  return out;
+}
+var syncMsg = "", syncPending = null;
+function renderSync(){
+  var days = 0; for(var d in S.log){ if(S.log[d].w+S.log[d].n+S.log[d].m>0) days++; }
+  var h = '<section class="view">';
+  h += '<div class="panel"><h2>Guardar y recuperar progreso</h2><p class="muted">Tu progreso vive solo en este navegador. Para pasarlo a otro dispositivo, o tener una copia por si se borra, usa un código de texto.</p>'
+    + '<p class="small muted">Ahora tienes: <span class="mono">'+S.palaces.length+'</span> palacio(s), <span class="mono">'+days+'</span> días entrenados, <span class="mono">'+(S.words.hist.length+S.nums.hist.length)+'</span> rondas y <span class="mono">'+majorFilled()+'</span> entradas en tu tabla.</p></div>';
+
+  h += '<div class="panel"><h3>1. Guardar</h3><p class="small muted">Copia el código y pégalo donde quieras: notas, un mensaje para ti mismo, un correo.</p>'
+    + '<div class="row"><button class="btn primary" id="sCopy">Copiar código</button></div>'
+    + '<textarea id="sOut" readonly></textarea></div>';
+
+  h += '<div class="panel"><h3>2. Recuperar</h3><p class="small muted">Pega un código de otro dispositivo. Se combina con lo que ya tienes: no se borra nada de aquí, solo se suma lo que falte.</p>'
+    + '<textarea id="sIn" placeholder="Pega aquí tu código MNEMOS1:..."></textarea>';
+  if(syncPending){
+    h += '<div class="confirm"><span>Código válido con '+syncPending.palaces.length+' palacio(s) y '+(syncPending.words.hist.length+syncPending.nums.hist.length)+' rondas.</span>'
+      + '<button class="btn small primary" id="sMerge">Combinar</button><button class="btn small danger" id="sReplace">Reemplazar todo</button><button class="btn small" id="sCancel">Cancelar</button></div>'
+      + '<p class="small muted">Combinar es lo normal. Reemplazar todo borra lo de este dispositivo y deja solo lo del código.</p>';
+  } else {
+    h += '<div class="row"><button class="btn" id="sCheck">Revisar código</button></div>';
+  }
+  if(syncMsg) h += '<p class="toast">'+esc(syncMsg)+'</p>';
+  h += '</div></section>';
+  view.innerHTML = h;
+  syncMsg = "";
+  var out = document.getElementById("sOut"); out.value = encodeState();
+  document.getElementById("sCopy").onclick = function(){
+    out.select();
+    var done = function(m){ var p = view.querySelector(".copied"); if(!p){ p=document.createElement("p"); p.className="toast copied"; out.after(p); } p.textContent = m; };
+    try{ navigator.clipboard.writeText(out.value).then(function(){ done("Código copiado."); }, function(){ done("El texto ya está seleccionado. Cópialo con Ctrl+C o mantén presionado."); }); }
+    catch(e){ done("El texto ya está seleccionado. Cópialo con Ctrl+C o mantén presionado."); }
+  };
+  var inp = document.getElementById("sIn");
+  if(syncPending) inp.value = syncPending._raw || "";
+  var chk = document.getElementById("sCheck");
+  if(chk) chk.onclick = function(){
+    try{ var o = decodeState(inp.value); o._raw = inp.value; syncPending = o; }
+    catch(e){ syncPending = null; syncMsg = "Ese código no es válido. Revisa que lo hayas pegado completo, desde MNEMOS1:."; }
+    renderSync();
+  };
+  function finish(o, m){ delete o._raw; var d = defaults(); for(var k in d){ if(!(k in o)) o[k]=d[k]; } S = o; save(); syncPending = null; syncMsg = m; renderSync(); }
+  var mg = document.getElementById("sMerge"); if(mg) mg.onclick = function(){ var b = syncPending; delete b._raw; finish(mergeState(S, b), "Progreso combinado."); };
+  var rp = document.getElementById("sReplace"); if(rp) rp.onclick = function(){ finish(syncPending, "Progreso reemplazado con el del código."); };
+  var cc = document.getElementById("sCancel"); if(cc) cc.onclick = function(){ syncPending = null; renderSync(); };
+}
+
+/* ---------- HOY ---------- */
+function renderHoy(){
+  var l = dayLog(), w = weekNum(), ph = phase(), st = streak();
+  var wordsTarget = 2, numsTarget = w>=3 ? 1 : 0, majorTarget = w>=2 ? 20 : 0;
+  var minPct = Math.min(100, Math.round(l.min/30*100));
+  var blocks = [];
+  var ownPalace = S.palaces.some(function(p){ return p.name.indexOf("(ejemplo)")<0 && p.loci.filter(function(z){return norm(z);}).length>=10; });
+  if(w<=2 || !ownPalace) blocks.push({done:ownPalace, t:"Construye tu propio palacio", d: ownPalace ? "Listo. Usa siempre el mismo recorrido." : "10 lugares reales que conozcas de memoria · unos 5 min", prog:"", tab:"palacio"});
+  blocks.push({done:l.w>=wordsTarget, t:"Palabras en el palacio", d:"2 rondas · unos 5 min", prog:l.w+" de "+wordsTarget, tab:"palabras"});
+  if(majorTarget) blocks.push({done:l.m>=majorTarget, t:"Repaso del sistema mayor", d: majorFilled()<10 ? "Primero llena al menos 10 entradas de tu tabla" : "20 tarjetas · unos 5 min", prog:l.m+" de "+majorTarget, tab:"mayor"});
+  else blocks.push({done:false, t:"Sistema mayor", d:"Toca en la semana 2. Puedes adelantarte y empezar tu tabla.", prog:"", tab:"mayor", locked:true});
+  if(numsTarget) blocks.push({done:l.n>=numsTarget, t:"Números", d:"1 ronda · unos 5 min", prog:l.n+" de "+numsTarget, tab:"numeros"});
+  else blocks.push({done:false, t:"Números", d:"Toca en la semana 3. Puedes probar una ronda sin tabla.", prog:"", tab:"numeros", locked:true});
+  var reqDone = blocks.every(function(b){ return b.locked || b.done; });
+
+  var h = '<section class="view">';
+  if(!S.seenGuide) h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>Primera vez</h3><p>Lee la guía antes de empezar: qué es un palacio de la memoria y cómo se usa. Son unos 5 minutos.</p></div><button class="btn primary" data-go="guia">Leer la guía</button></div></div>';
+  h += '<div class="panel"><div class="daybar">'
+    + '<div class="stat"><h3>Hoy</h3><b class="mono">'+Math.round(l.min)+'<span class="muted small"> / 30 min</span></b><div class="meter"><i style="width:'+minPct+'%"></i></div></div>'
+    + '<div class="stat"><h3>Racha</h3><b class="mono">'+st+'</b><span class="muted small">'+(st===1?"día seguido":"días seguidos")+'</span></div>'
+    + '<div class="stat"><h3>Nivel</h3><b class="mono">'+S.words.level+'</b><span class="muted small">palabras por ronda</span></div>'
+    + '</div></div>';
+  h += '<div class="panel"><div class="phase"><h3>Fase actual</h3><h2>'+esc(ph.t)+'</h2><p class="muted">'+esc(ph.d)+'</p></div></div>';
+  h += '<div class="panel"><h3>Sesión de hoy</h3><div class="blocks">';
+  blocks.forEach(function(b){
+    h += '<div class="block"><div class="check'+(b.done?' done':'')+'"></div><div><div style="font-weight:600">'+esc(b.t)+'</div><div class="muted small">'+esc(b.d)+(b.prog?' · <span class="mono">'+b.prog+'</span>':'')+'</div></div>'
+      + '<button class="btn small'+(b.locked?' ghost':'')+'" data-go="'+b.tab+'">'+(b.locked?'Adelantar':'Ir')+'</button></div>';
+  });
+  h += '</div></div>';
+  if(reqDone && l.min < 30){
+    var left = Math.max(1, Math.round(30 - l.min));
+    h += '<div class="panel"><div class="phase"><h3>Lo obligatorio está hecho</h3><h2>Te quedan unos '+left+' min opcionales</h2>'
+      + '<p class="muted">Puedes cerrar aquí y el día cuenta para la racha. Si quieres usar el resto, en este orden rinde más:</p></div>'
+      + '<div class="blocks">'
+      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Más rondas de palabras</div><div class="muted small">Cada ronda extra puede subirte de nivel. Prueba bajar a 6 segundos por estación.</div></div><button class="btn small" data-go="palabras">Ir</button></div>'
+      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Repasa el palacio sin la app</div><div class="muted small">Cierra los ojos y recorre los lugares en orden, ida y vuelta. Lugares nítidos dan imágenes firmes.</div></div><button class="btn small" data-go="palacio">Ver</button></div>'
+      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Adelanta tu tabla del sistema mayor</div><div class="muted small">Escribe palabras del 00 al 09. Es la tarea que más tiempo pide después.</div></div><button class="btn small" data-go="mayor">Ir</button></div>'
+      + '</div></div>';
+  } else if(reqDone){
+    h += '<div class="panel"><div class="phase"><h3>Sesión completa</h3><h2>30 minutos hechos</h2><p class="muted">Mañana sigue. La constancia diaria pesa más que las sesiones largas.</p></div></div>';
+  }
+  h += '<div class="panel"><h3>Por qué funciona</h3><p class="small muted">En el estudio de Dresler (Neuron, 2017), personas sin experiencia que entrenaron el método de loci unos 30 minutos al día durante 6 semanas pasaron de recordar unas 26 palabras a más de 60, y lo mantuvieron meses después. Este plan sigue esa estructura.</p></div>';
+  h += '</section>';
+  view.innerHTML = h;
+  view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
+}
+
+/* ---------- PALACIO ---------- */
+var palConfirm = false;
+function renderPalacio(){
+  var p = palace();
+  var h = '<section class="view">';
+  h += '<div class="panel"><div class="row" style="justify-content:space-between"><h3>Tus palacios</h3><button class="btn small" id="newPal">Nuevo palacio</button></div>';
+  h += '<select id="palSel">'+S.palaces.map(function(x){ return '<option value="'+esc(x.id)+'"'+(x.id===S.active?' selected':'')+'>'+esc(x.name)+' ('+x.loci.filter(function(z){return norm(z);}).length+' lugares)</option>'; }).join("")+'</select></div>';
+
+  h += '<div class="panel"><h3>Nombre</h3><input id="palName" value="'+esc(p.name)+'">';
+  h += '<h3 style="margin-top:6px">Recorrido</h3><p class="small muted">Ordena los lugares como si caminaras por el sitio. Siempre en la misma dirección. Lugares distintos entre sí funcionan mejor que cinco sillas iguales.</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:6px" id="lociList">';
+  p.loci.forEach(function(x,i){
+    h += '<div class="locus"><span class="pin">'+pad2(i+1)+'</span><input data-li="'+i+'" value="'+esc(x)+'" placeholder="Lugar '+(i+1)+'">'
+      + '<div class="lbtns"><button class="btn small ghost mv" data-up="'+i+'" aria-label="Subir lugar"'+(i===0?' disabled':'')+'>&#9650;</button>'
+      + '<button class="btn small ghost mv" data-down="'+i+'" aria-label="Bajar lugar"'+(i===p.loci.length-1?' disabled':'')+'>&#9660;</button>'
+      + '<button class="btn small ghost" data-del="'+i+'" aria-label="Quitar lugar">Quitar</button></div></div>';
+  });
+  h += '</div><div class="row"><button class="btn small" id="addLoc">Añadir lugar</button><button class="btn small" id="add5">Añadir 5</button></div>';
+  if(S.palaces.length>1){
+    h += palConfirm ? '<div class="confirm"><span>¿Borrar este palacio?</span><button class="btn small danger" id="palDelYes">Sí, borrar</button><button class="btn small" id="palDelNo">Cancelar</button></div>'
+                    : '<div><button class="btn small ghost danger" id="palDel">Borrar palacio</button></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="panel"><h3>Cómo hacer imágenes que se quedan</h3><div class="tips">'
+    + '<div class="tip"><b>Exagera</b>Una manzana del tamaño de la puerta, no una manzana.</div>'
+    + '<div class="tip"><b>Ponla en movimiento</b>Que explote, gire, gotee o persiga algo.</div>'
+    + '<div class="tip"><b>Que toque el lugar</b>El objeto tiene que interactuar con el sitio: aplastar el sofá, inundar el fregadero.</div>'
+    + '<div class="tip"><b>Usa los sentidos</b>Olor, sonido, textura. Lo raro y lo gracioso se recuerda mejor que lo lógico.</div>'
+    + '</div></div>';
+  h += '</section>';
+  view.innerHTML = h;
+
+  document.getElementById("palSel").onchange = function(){ S.active = this.value; palConfirm=false; save(); renderPalacio(); };
+  document.getElementById("palName").oninput = function(){ p.name = this.value; save(); };
+  view.querySelectorAll("[data-li]").forEach(function(inp){ inp.oninput = function(){ p.loci[+inp.getAttribute("data-li")] = inp.value; save(); }; });
+  view.querySelectorAll("[data-del]").forEach(function(b){ b.onclick = function(){ p.loci.splice(+b.getAttribute("data-del"),1); save(); renderPalacio(); }; });
+  function move(i, d){
+    var j = i + d; if(j<0 || j>=p.loci.length) return;
+    var t = p.loci[i]; p.loci[i] = p.loci[j]; p.loci[j] = t; save(); renderPalacio();
+    var btn = view.querySelector('[data-'+(d<0?'up':'down')+'="'+j+'"]');
+    if(btn && !btn.disabled) btn.focus(); else { var inp = view.querySelector('[data-li="'+j+'"]'); if(inp) inp.focus(); }
+  }
+  view.querySelectorAll("[data-up]").forEach(function(b){ b.onclick = function(){ move(+b.getAttribute("data-up"), -1); }; });
+  view.querySelectorAll("[data-down]").forEach(function(b){ b.onclick = function(){ move(+b.getAttribute("data-down"), 1); }; });
+  document.getElementById("addLoc").onclick = function(){ p.loci.push(""); save(); renderPalacio(); var ins=view.querySelectorAll("[data-li]"); ins[ins.length-1].focus(); };
+  document.getElementById("add5").onclick = function(){ for(var i=0;i<5;i++) p.loci.push(""); save(); renderPalacio(); };
+  document.getElementById("newPal").onclick = function(){ var id="p"+Date.now(); S.palaces.push({id:id,name:"Palacio "+(S.palaces.length+1),loci:["","","","","","","","","",""]}); S.active=id; palConfirm=false; save(); renderPalacio(); };
+  var d = document.getElementById("palDel"); if(d) d.onclick = function(){ palConfirm=true; renderPalacio(); };
+  var y = document.getElementById("palDelYes"); if(y) y.onclick = function(){ S.palaces = S.palaces.filter(function(x){return x.id!==p.id;}); S.active=S.palaces[0].id; palConfirm=false; save(); renderPalacio(); };
+  var n = document.getElementById("palDelNo"); if(n) n.onclick = function(){ palConfirm=false; renderPalacio(); };
+}
+
+/* ---------- PALABRAS ---------- */
+var W = {phase:"setup"};
+function renderPalabras(){
+  var L = loci(), N = S.words.level;
+  if(W.phase==="setup"){
+    var per = Math.max(1, Math.ceil(N / Math.max(1,L.length)));
+    var h = '<section class="view"><div class="panel">';
+    h += '<h2>Lista de palabras</h2><p class="muted">Verás <b class="mono">'+N+'</b> palabras, una estación a la vez. Coloca cada una en su lugar de <b>'+esc(palace().name)+'</b> con una imagen exagerada. Después las escribes en orden.</p>';
+    if(L.length<3) h += '<p class="small" style="color:var(--bad)">Tu palacio necesita al menos 3 lugares. Edítalo en la pestaña Palacio.</p>';
+    else if(per>1) h += '<p class="small muted">Tu palacio tiene '+L.length+' lugares, así que pondrás '+per+' palabras por lugar. Haz que interactúen entre ellas.</p>';
+    h += '<div class="row"><label class="small muted" for="secs">Segundos por estación</label><select id="secs" style="width:auto">'+[4,5,6,8,10,15,20].map(function(s){ return '<option'+(s===S.words.secs?' selected':'')+'>'+s+'</option>'; }).join("")+'</select></div>';
+    h += '<div class="row"><button class="btn primary" id="wStart"'+(L.length<3?' disabled':'')+'>Empezar ronda</button><span class="small muted">Nivel sube con 90% o más, baja con menos de 60%.</span></div>';
+    h += '</div></section>';
+    view.innerHTML = h;
+    document.getElementById("secs").onchange = function(){ S.words.secs = +this.value; save(); };
+    document.getElementById("wStart").onclick = function(){
+      var list = shuffle(WORDS).slice(0, N);
+      var per2 = Math.max(1, Math.ceil(N / L.length));
+      var stations = [];
+      for(var i=0;i<list.length;i+=per2) stations.push({locus:L[stations.length % L.length], words:list.slice(i,i+per2)});
+      W = {phase:"study", stations:stations, idx:0, t0:Date.now(), N:N};
+      renderPalabras();
+    };
+    return;
+  }
+  if(W.phase==="study"){
+    var st = W.stations[W.idx];
+    view.innerHTML = '<section class="view"><div class="panel"><div class="stage">'
+      + '<div class="where">Estación '+(W.idx+1)+' de '+W.stations.length+'</div>'
+      + '<div class="locusname">'+esc(st.locus)+'</div>'
+      + '<div class="word">'+st.words.map(esc).join("<br>")+'</div>'
+      + '<div class="timer"><i id="tbar"></i></div></div>'
+      + '<div class="row" style="justify-content:center"><button class="btn" id="prev"'+(W.idx===0?' disabled':'')+'>Anterior</button><button class="btn" id="next">Siguiente</button><button class="btn primary" id="toRecall">Ya, a recordar</button></div>'
+      + '</div></section>';
+    var dur = S.words.secs*1000, t = Date.now(), bar = document.getElementById("tbar");
+    stopTimer();
+    timerId = setInterval(function(){ var p = 1-(Date.now()-t)/dur; bar.style.width = Math.max(0,p*100)+"%"; if(p<=0){ advance(); } }, 80);
+    function advance(){ stopTimer(); if(W.idx < W.stations.length-1){ W.idx++; renderPalabras(); } else { W.phase="recall"; renderPalabras(); } }
+    document.getElementById("next").onclick = advance;
+    document.getElementById("prev").onclick = function(){ stopTimer(); W.idx--; renderPalabras(); };
+    document.getElementById("toRecall").onclick = function(){ stopTimer(); W.phase="recall"; renderPalabras(); };
+    return;
+  }
+  if(W.phase==="recall"){
+    var h2 = '<section class="view"><div class="panel"><h2>Recorre el palacio</h2><p class="muted small">Camina mentalmente por cada lugar y escribe lo que encuentres. Deja vacío lo que no recuerdes.</p><div class="recall">';
+    W.stations.forEach(function(s,i){
+      h2 += '<div class="rline"><label>'+pad2(i+1)+' '+esc(s.locus)+'</label><div class="ins">'
+        + s.words.map(function(_,j){ return '<input id="r'+i+'_'+j+'" autocomplete="off" autocapitalize="off" spellcheck="false">'; }).join("")
+        + '</div></div>';
+    });
+    h2 += '</div><div class="row"><button class="btn primary" id="grade">Corregir</button></div></div></section>';
+    view.innerHTML = h2;
+    var first = document.getElementById("r0_0"); if(first) first.focus();
+    document.getElementById("grade").onclick = function(){
+      var ok=0, rows=[];
+      W.stations.forEach(function(s,i){ s.words.forEach(function(w,j){ var v=document.getElementById("r"+i+"_"+j).value; var g=same(v,w); if(g) ok++; rows.push({want:w, got:v, ok:g, locus:s.locus}); }); });
+      var acc = ok/W.N, old = S.words.level, lvl = old;
+      if(acc>=0.9) lvl = old+2; else if(acc<0.6) lvl = Math.max(5, old-1);
+      S.words.level = lvl;
+      S.words.hist.push({d:todayStr(), n:W.N, ok:ok, s:S.words.secs, ts:Date.now()});
+      dayLog().w++; addMinutes(Date.now()-W.t0); save();
+      W = {phase:"result", rows:rows, ok:ok, N:W.N, old:old, lvl:lvl};
+      renderPalabras();
+    };
+    return;
+  }
+  if(W.phase==="result"){
+    var msg = W.lvl>W.old ? "Subes a "+W.lvl+" palabras." : W.lvl<W.old ? "Bajas a "+W.lvl+" palabras para consolidar." : "Te quedas en "+W.lvl+" palabras.";
+    var h3 = '<section class="view"><div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+W.ok+'<span class="muted" style="font-size:1.2rem"> / '+W.N+'</span></div></div><p class="muted">'+msg+'</p></div>';
+    h3 += '<div>';
+    W.rows.forEach(function(r){ h3 += '<div class="res"><span>'+esc(r.want)+'</span><span class="'+(r.ok?'ok':'bad')+'">'+esc(r.got||"vacío")+'</span><span class="'+(r.ok?'ok':'bad')+'">'+(r.ok?'✓':'✗')+'</span></div>'; });
+    h3 += '</div><div class="row"><button class="btn primary" id="again">Otra ronda</button><button class="btn" id="home">Volver a Hoy</button></div>';
+    h3 += '<p class="small muted">Mira los fallos: casi siempre son lugares donde la imagen fue débil o el lugar se parecía a otro. Refuerza esa estación del palacio.</p></div></section>';
+    view.innerHTML = h3;
+    document.getElementById("again").onclick = function(){ W={phase:"setup"}; renderPalabras(); };
+    document.getElementById("home").onclick = function(){ W={phase:"setup"}; go("hoy"); };
+  }
+}
+
+/* ---------- NUMEROS ---------- */
+var Nm = {phase:"setup"};
+function renderNumeros(){
+  var N = S.nums.level;
+  if(Nm.phase==="setup"){
+    var filled = majorFilled();
+    var h = '<section class="view"><div class="panel"><h2>Secuencia de dígitos</h2>'
+      + '<p class="muted">Memoriza <b class="mono">'+N+'</b> dígitos. Agrupa de dos en dos, convierte cada par en la palabra de tu tabla del sistema mayor y colócala en un lugar del palacio.</p>';
+    if(filled<20) h += '<p class="small muted">Tu tabla tiene '+filled+' entradas. Sin ella puedes practicar igual, pero el salto real llega cuando cada par ya tiene una imagen fija.</p>';
+    h += '<div class="row"><button class="btn primary" id="nStart">Empezar ronda</button><span class="small muted">Tiempo de estudio: '+(N*3)+' s</span></div></div></section>';
+    view.innerHTML = h;
+    document.getElementById("nStart").onclick = function(){
+      var s=""; for(var i=0;i<N;i++) s += Math.floor(Math.random()*10);
+      Nm = {phase:"study", seq:s, t0:Date.now()}; renderNumeros();
+    };
+    return;
+  }
+  if(Nm.phase==="study"){
+    var pairs = Nm.seq.match(/.{1,2}/g);
+    var hints = pairs.map(function(p){ var w = S.major.t[p]; return w && norm(w) ? esc(w) : ""; });
+    view.innerHTML = '<section class="view"><div class="panel"><div class="stage">'
+      + '<div class="where">Memoriza</div><div class="digits">'+pairs.map(function(p){return '<span>'+p+'</span>';}).join("")+'</div>'
+      + '<div class="timer"><i id="tbar"></i></div><div class="small muted mono" id="tleft"></div></div>'
+      + '<div class="row" style="justify-content:center"><button class="btn primary" id="nDone">Listo</button></div></div></section>';
+    var dur = N*3000, t = Date.now(), bar = document.getElementById("tbar"), tl = document.getElementById("tleft");
+    stopTimer();
+    timerId = setInterval(function(){ var el=Date.now()-t, p=1-el/dur; bar.style.width=Math.max(0,p*100)+"%"; tl.textContent=Math.max(0,Math.ceil((dur-el)/1000))+" s"; if(p<=0){ stopTimer(); Nm.phase="recall"; renderNumeros(); } }, 100);
+    document.getElementById("nDone").onclick = function(){ stopTimer(); Nm.phase="recall"; renderNumeros(); };
+    return;
+  }
+  if(Nm.phase==="recall"){
+    view.innerHTML = '<section class="view"><div class="panel"><h2>Escribe la secuencia</h2><p class="small muted">'+N+' dígitos, en orden. Los espacios no cuentan.</p>'
+      + '<input id="nIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.2rem;letter-spacing:.08em">'
+      + '<div class="row"><button class="btn primary" id="nGrade">Corregir</button></div></div></section>';
+    var inp = document.getElementById("nIn"); inp.focus();
+    function grade(){
+      var got = inp.value.replace(/\D/g,""), ok=0;
+      for(var i=0;i<Nm.seq.length;i++) if(got[i]===Nm.seq[i]) ok++;
+      var acc = ok/N, old=S.nums.level, lvl=old;
+      if(acc>=0.9) lvl=old+2; else if(acc<0.6) lvl=Math.max(6,old-2);
+      S.nums.level=lvl; S.nums.hist.push({d:todayStr(), n:N, ok:ok, ts:Date.now()});
+      dayLog().n++; addMinutes(Date.now()-Nm.t0); save();
+      Nm = {phase:"result", seq:Nm.seq, got:got, ok:ok, N:N, old:old, lvl:lvl}; renderNumeros();
+    }
+    document.getElementById("nGrade").onclick = grade;
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") grade(); });
+    return;
+  }
+  if(Nm.phase==="result"){
+    var gotHtml = "";
+    for(var i=0;i<Nm.seq.length;i++){ var g = Nm.got[i]||"·"; gotHtml += (i%2===0?'<span>':'') + (g===Nm.seq[i] ? g : '<span class="x">'+g+'</span>') + (i%2===1||i===Nm.seq.length-1?'</span>':''); }
+    var msg = Nm.lvl>Nm.old ? "Subes a "+Nm.lvl+" dígitos." : Nm.lvl<Nm.old ? "Bajas a "+Nm.lvl+" dígitos." : "Te quedas en "+Nm.lvl+" dígitos.";
+    view.innerHTML = '<section class="view"><div class="panel">'
+      + '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+Nm.ok+'<span class="muted" style="font-size:1.2rem"> / '+Nm.N+'</span></div></div><p class="muted">'+msg+'</p></div>'
+      + '<h3>Correcto</h3><div class="digits" style="justify-content:flex-start">'+Nm.seq.match(/.{1,2}/g).map(function(p){return '<span>'+p+'</span>';}).join("")+'</div>'
+      + '<h3>Lo tuyo</h3><div class="digits" style="justify-content:flex-start">'+gotHtml+'</div>'
+      + '<div class="row"><button class="btn primary" id="nAgain">Otra ronda</button><button class="btn" id="nHome">Volver a Hoy</button></div></div></section>';
+    document.getElementById("nAgain").onclick = function(){ Nm={phase:"setup"}; renderNumeros(); };
+    document.getElementById("nHome").onclick = function(){ Nm={phase:"setup"}; go("hoy"); };
+  }
+}
+
+/* ---------- SISTEMA MAYOR ---------- */
+var BOX_DAYS = [0,1,2,4,8,16,32];
+var Q = null, showTable = false;
+function dueList(){
+  var t = todayStr(), out=[];
+  for(var i=0;i<100;i++){ var k=pad2(i); if(!norm(S.major.t[k])) continue; var c=S.major.c[k]; if(!c || c.due<=t) out.push(k); }
+  return out;
+}
+function renderMayor(){
+  if(Q){ return renderQuiz(); }
+  var due = dueList(), filled = majorFilled();
+  var h = '<section class="view">';
+  h += '<div class="panel"><h2>Sonidos de cada dígito</h2><p class="small muted">Solo cuentan las consonantes por cómo suenan. Las vocales y la h son libres para armar palabras. Así 31 puede ser <b>mate</b> y 42 puede ser <b>rana</b>.</p>'
+    + '<div class="ref">'
+    + [["0","s z c suave"],["1","t d"],["2","n ñ"],["3","m"],["4","r"],["5","l ll"],["6","ch j g suave"],["7","c dura k q g dura"],["8","f v"],["9","p b"]].map(function(r){ return '<div><b>'+r[0]+'</b>'+r[1]+'</div>'; }).join("")
+    + '</div><p class="small muted">Ejemplos: 10 taza, 21 nata, 53 lima, 75 cola, 84 faro, 95 bala.</p></div>';
+
+  h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>Repaso</h3><p><b class="mono">'+due.length+'</b> tarjetas pendientes · <span class="mono">'+filled+'</span> de 100 en tu tabla</p></div>'
+    + '<button class="btn primary" id="qStart"'+(due.length?'':' disabled')+'>Repasar</button></div>'
+    + (filled===0 ? '<p class="small muted">Tu tabla está vacía. Abre la tabla y escribe una palabra concreta para cada número, empezando por el 00. Que sean cosas que puedas imaginar, no ideas abstractas.</p>' : '')
+    + '</div>';
+
+  h += '<div class="panel"><div class="row" style="justify-content:space-between"><h3>Tu tabla</h3><button class="btn small" id="tblToggle">'+(showTable?'Ocultar tabla':'Abrir tabla')+'</button></div>';
+  if(showTable){
+    h += '<div class="grid100">';
+    for(var i=0;i<100;i++){ var k=pad2(i); h += '<label class="cell"><span>'+k+'</span><input data-mk="'+k+'" value="'+esc(S.major.t[k]||"")+'" autocomplete="off" spellcheck="false"></label>'; }
+    h += '</div>';
+  }
+  h += '</div></section>';
+  view.innerHTML = h;
+  document.getElementById("tblToggle").onclick = function(){ showTable=!showTable; renderMayor(); };
+  view.querySelectorAll("[data-mk]").forEach(function(inp){ inp.oninput = function(){ S.major.t[inp.getAttribute("data-mk")] = inp.value; save(); }; });
+  document.getElementById("qStart").onclick = function(){ Q = {queue:shuffle(dueList()).slice(0,20), shown:false, failed:{}, t0:Date.now(), done:0}; renderMayor(); };
+}
+function renderQuiz(){
+  if(!Q.queue.length){
+    addMinutes(Date.now()-Q.t0); save();
+    view.innerHTML = '<section class="view"><div class="panel"><div class="card"><h3>Repaso terminado</h3><div class="big mono">'+Q.done+'</div><p class="muted">tarjetas repasadas hoy en esta sesión</p><button class="btn primary" id="qEnd">Volver</button></div></div></section>';
+    document.getElementById("qEnd").onclick = function(){ Q=null; renderMayor(); };
+    return;
+  }
+  var k = Q.queue[0];
+  view.innerHTML = '<section class="view"><div class="panel"><div class="card">'
+    + '<div class="where small muted mono">Quedan '+Q.queue.length+'</div><div class="big mono" style="font-size:4rem;color:var(--brass)">'+k+'</div>'
+    + (Q.shown ? '<div class="word" style="font-family:var(--f-display);font-weight:750;font-size:2rem">'+esc(S.major.t[k])+'</div>'
+               : '<p class="muted small">Piensa la palabra e imagínala antes de mostrarla.</p>')
+    + '<div class="row" style="justify-content:center">'
+    + (Q.shown ? '<button class="btn" id="qBad">Fallé</button><button class="btn primary" id="qOk">La tenía</button>' : '<button class="btn primary" id="qShow">Mostrar</button>')
+    + '</div><button class="btn small ghost" id="qQuit">Salir</button></div></div></section>';
+  if(!Q.shown){ document.getElementById("qShow").onclick = function(){ Q.shown=true; renderQuiz(); }; }
+  else {
+    document.getElementById("qOk").onclick = function(){ mark(k,true); };
+    document.getElementById("qBad").onclick = function(){ mark(k,false); };
+  }
+  document.getElementById("qQuit").onclick = function(){ addMinutes(Date.now()-Q.t0); save(); Q=null; renderMayor(); };
+}
+function mark(k, ok){
+  var c = S.major.c[k] || {b:0, due:todayStr()};
+  Q.queue.shift(); Q.shown=false; Q.done++;
+  if(ok && !Q.failed[k]){ c.b = Math.min(BOX_DAYS.length-1, c.b+1); c.due = addDays(todayStr(), BOX_DAYS[c.b]); }
+  else if(ok){ c.b = 1; c.due = addDays(todayStr(), 1); }
+  else { c.b = 0; c.due = todayStr(); if(!Q.failed[k]){ Q.failed[k]=true; Q.queue.push(k); } }
+  S.major.c[k] = c; dayLog().m++; save(); renderQuiz();
+}
+
+/* ---------- PROGRESO ---------- */
+function chart(hist, color, label){
+  var data = hist.slice(-30);
+  if(data.length<2) return '<p class="small muted">'+label+': aparece cuando tengas al menos 2 rondas.</p>';
+  var Wd=640, H=180, ml=34, mr=10, mt=12, mb=22;
+  var max = 0; data.forEach(function(d){ max=Math.max(max,d.n,d.ok); });
+  var step = max<=20?5:max<=50?10:20; max = Math.ceil(max/step)*step;
+  function x(i){ return ml + i*(Wd-ml-mr)/(data.length-1); }
+  function y(v){ return mt + (H-mt-mb)*(1-v/max); }
+  var g = "";
+  for(var v=0; v<=max; v+=step){ g += '<line x1="'+ml+'" x2="'+(Wd-mr)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)" stroke-width="1"/><text x="'+(ml-6)+'" y="'+(y(v)+3)+'" text-anchor="end">'+v+'</text>'; }
+  var target = data.map(function(d,i){ return (i?"L":"M")+x(i).toFixed(1)+" "+y(d.n).toFixed(1); }).join(" ");
+  var got = data.map(function(d,i){ return (i?"L":"M")+x(i).toFixed(1)+" "+y(d.ok).toFixed(1); }).join(" ");
+  var area = got + " L"+x(data.length-1).toFixed(1)+" "+y(0)+" L"+x(0)+" "+y(0)+" Z";
+  var last = data[data.length-1];
+  g += '<path d="'+area+'" fill="'+color+'" fill-opacity=".12"/>';
+  g += '<path d="'+target+'" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4"/>';
+  g += '<path d="'+got+'" fill="none" stroke="'+color+'" stroke-width="2.2" stroke-linejoin="round"/>';
+  g += '<circle cx="'+x(data.length-1)+'" cy="'+y(last.ok)+'" r="4" fill="'+color+'"/>';
+  g += '<text x="'+ml+'" y="'+(H-6)+'">ronda 1</text><text x="'+(Wd-mr)+'" y="'+(H-6)+'" text-anchor="end">ronda '+data.length+'</text>';
+  return '<div class="chartbox"><svg viewBox="0 0 '+Wd+' '+H+'" width="100%" style="min-width:360px" role="img" aria-label="'+label+'">'+g+'</svg></div>';
+}
+var impMsg = "";
+function renderProgreso(){
+  var totalMin = 0, days = 0; for(var d in S.log){ totalMin += S.log[d].min; if(S.log[d].w+S.log[d].n+S.log[d].m>0) days++; }
+  var bestW = 0; S.words.hist.forEach(function(h){ bestW=Math.max(bestW,h.ok); });
+  var bestN = 0; S.nums.hist.forEach(function(h){ bestN=Math.max(bestN,h.ok); });
+  var h = '<section class="view">';
+  h += '<div class="panel"><div class="daybar">'
+    + '<div class="stat"><h3>Días entrenados</h3><b class="mono">'+days+'</b><span class="muted small">'+Math.round(totalMin)+' min en total</span></div>'
+    + '<div class="stat"><h3>Mejor lista</h3><b class="mono">'+bestW+'</b><span class="muted small">palabras en orden</span></div>'
+    + '<div class="stat"><h3>Mejor número</h3><b class="mono">'+bestN+'</b><span class="muted small">dígitos</span></div>'
+    + '</div></div>';
+  h += '<div class="panel"><h3>Palabras por ronda</h3><div class="legend"><span><i style="background:var(--accent)"></i>recordadas</span><span><i style="background:var(--muted)"></i>mostradas</span></div>'+chart(S.words.hist,"var(--accent)","Palabras por ronda")+'</div>';
+  h += '<div class="panel"><h3>Dígitos por ronda</h3>'+chart(S.nums.hist,"var(--brass)","Dígitos por ronda")+'</div>';
+  h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>Copia de seguridad</h3><p class="small muted">Lleva tu progreso a otro dispositivo con un código.</p></div><button class="btn small" data-go="sync">Guardar / recuperar</button></div></div>'
+    + '</section>';
+  view.innerHTML = h;
+  view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
+}
+
+/* ---------- boot ---------- */
+var startTab = "hoy";
+try{ var t = localStorage.getItem(KEY+".tab"); if(t && ["hoy","guia","palacio","palabras","numeros","mayor","progreso"].indexOf(t)>=0) startTab = t; }catch(e){}
+save();
+go(startTab);
+})();
+</script>
