@@ -93,7 +93,9 @@ textarea{font-family:var(--f-mono);font-size:.78rem;min-height:90px}
 .rline{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:8px;align-items:center}
 .rline label{font-size:.85rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rline .ins{display:flex;gap:6px;min-width:0}
-.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 20px;gap:8px;font-size:.9rem;padding:6px 0;border-top:1px solid var(--line)}
+.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 4.6rem;gap:8px;font-size:.9rem;padding:6px 0;border-top:1px solid var(--line);align-items:center}
+.res>:last-child{justify-self:end}
+.res .how{font-size:.75rem;color:var(--muted)}
 .res .ok{color:var(--ok)} .res .bad{color:var(--bad)}
 .digits{font-family:var(--f-mono);font-weight:600;font-size:clamp(1.4rem,6.5vw,2rem);letter-spacing:.04em;display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-variant-numeric:tabular-nums}
 .digits span.x{color:var(--bad);text-decoration:underline}
@@ -206,6 +208,28 @@ function addMinutes(ms){ var l = dayLog(); l.min = Math.round((l.min + ms/60000)
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
 function norm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim(); }
 function same(a,b){ a=norm(a); b=norm(b); if(!a||!b) return false; return a===b || a+"s"===b || b+"s"===a || a+"es"===b || b+"es"===a; }
+var SYN = [
+  "paraguas,sombrilla","platano,banano,banana,guineo","bombilla,bombillo,foco,ampolleta,bombita","aguacate,palta","fresa,frutilla",
+  "sarten,paila","pelota,bola,balon","maleta,valija","avion,avioneta","barco,bote,buque,lancha","olla,cacerola,cazuela,cazo",
+  "ventilador,abanico","yogur,yogurt","tostadora,tostador","muneco,muneca","linterna,foquito","buho,lechuza","cocodrilo,caiman,lagarto",
+  "dinosaurio,dino","bicicleta,bici","microfono,micro","rueda,llanta","salchicha,hot dog,perro caliente,salchichon","camello,dromedario",
+  "ataud,feretro","calabaza,ayote,zapallo","cometa,papalote,barrilete,volantin","yoyo,yo-yo","camion,troca,camioneta",
+  "zapato,zapatilla,tenis","hamburguesa,burger","helado,nieve,paleta","jabon,pastilla de jabon",
+  "telescopio,catalejo","tiburon,escualo","escalera,escalerilla","cerdo,chancho,puerco","perro,can,chucho","gato,minino",
+  "piano,teclado","trompo,peonza","candado,cerradura","lampara,velador","cuchara,cucharon","sombrero,gorro","bufanda,chalina",
+  "ladrillo,bloque","martillo,mazo","taladro,berbiquí","iman,magneto","oveja,borrego,cordero","caballo,yegua,corcel",
+  "ninja,shinobi","vikingo,nordico","mago,hechicero,brujo","bruja,hechicera","pirata,bucanero","robot,androide","cohete,nave"
+];
+var SYNMAP = {};
+SYN.forEach(function(g,i){ g.split(",").forEach(function(w){ SYNMAP[norm(w)] = i; }); });
+function synGroup(w){
+  w = norm(w); if(w in SYNMAP) return SYNMAP[w];
+  if(w.slice(-2)==="es" && (w.slice(0,-2) in SYNMAP)) return SYNMAP[w.slice(0,-2)];
+  if(w.slice(-1)==="s" && (w.slice(0,-1) in SYNMAP)) return SYNMAP[w.slice(0,-1)];
+  return -1;
+}
+function isSyn(a,b){ var ga = synGroup(a); return ga>=0 && ga===synGroup(b); }
+function levelFor(ok, n, old){ var acc = ok/n; return acc>=0.9 ? old+2 : acc<0.6 ? Math.max(5, old-1) : old; }
 function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function palace(){ for(var i=0;i<S.palaces.length;i++) if(S.palaces[i].id===S.active) return S.palaces[i]; S.active=S.palaces[0].id; return S.palaces[0]; }
 function loci(){ return palace().loci.filter(function(x){ return norm(x); }); }
@@ -548,7 +572,7 @@ function renderPalabras(){
     var h = '<section class="view"><div class="panel">';
     h += '<h2>Lista de palabras</h2><p class="muted">Verás <b class="mono">'+N+'</b> palabras, una estación a la vez. Coloca cada una en su lugar de <b>'+esc(palace().name)+'</b> con una imagen exagerada. Después las escribes en orden.</p>';
     if(L.length<3) h += '<p class="small" style="color:var(--bad)">Tu palacio necesita al menos 3 lugares. Edítalo en la pestaña Palacio.</p>';
-    else if(per>1) h += '<p class="small muted">Tu palacio tiene '+L.length+' lugares, así que pondrás '+per+' palabras por lugar. Haz que interactúen entre ellas.</p>';
+    else if(N>L.length) h += '<p class="small muted">Tu palacio tiene '+L.length+' lugares para '+N+' palabras, así que algunos lugares tendrán '+per+'. Haz que interactúen entre ellas en la misma escena. Dentro de un lugar el orden no importa.</p>';
     h += '<div class="row"><label class="small muted" for="secs">Segundos por estación</label><select id="secs" style="width:auto">'+[4,5,6,8,10,15,20].map(function(s){ return '<option'+(s===S.words.secs?' selected':'')+'>'+s+'</option>'; }).join("")+'</select></div>';
     h += '<div class="row"><button class="btn primary" id="wStart"'+(L.length<3?' disabled':'')+'>Empezar ronda</button><span class="small muted">Nivel sube con 90% o más, baja con menos de 60%.</span></div>';
     h += '</div></section>';
@@ -556,9 +580,8 @@ function renderPalabras(){
     document.getElementById("secs").onchange = function(){ S.words.secs = +this.value; save(); };
     document.getElementById("wStart").onclick = function(){
       var list = shuffle(WORDS).slice(0, N);
-      var per2 = Math.max(1, Math.ceil(N / L.length));
-      var stations = [];
-      for(var i=0;i<list.length;i+=per2) stations.push({locus:L[stations.length % L.length], words:list.slice(i,i+per2)});
+      var nst = Math.min(L.length, N), base = Math.floor(N / nst), extra = N % nst, stations = [], pos = 0;
+      for(var k=0;k<nst;k++){ var size = base + (k < extra ? 1 : 0); stations.push({locus:L[k], words:list.slice(pos, pos+size)}); pos += size; }
       W = {phase:"study", stations:stations, idx:0, t0:Date.now(), N:N};
       renderPalabras();
     };
@@ -594,13 +617,21 @@ function renderPalabras(){
     var first = document.getElementById("r0_0"); if(first) first.focus();
     document.getElementById("grade").onclick = function(){
       var ok=0, rows=[];
-      W.stations.forEach(function(s,i){ s.words.forEach(function(w,j){ var v=document.getElementById("r"+i+"_"+j).value; var g=same(v,w); if(g) ok++; rows.push({want:w, got:v, ok:g, locus:s.locus}); }); });
-      var acc = ok/W.N, old = S.words.level, lvl = old;
-      if(acc>=0.9) lvl = old+2; else if(acc<0.6) lvl = Math.max(5, old-1);
+      W.stations.forEach(function(s,i){
+        var gots = s.words.map(function(_,j){ return document.getElementById("r"+i+"_"+j).value; });
+        var used = gots.map(function(){ return false; });
+        var res = s.words.map(function(w){ return {want:w, got:"", ok:false, how:"", locus:s.locus}; });
+        function take(k, j){ var w = s.words[k], g = gots[j]; var how = same(g,w) ? "" : "sinónimo"; if(j!==k) how = how ? how+", otro orden" : "otro orden"; res[k] = {want:w, got:g, ok:true, how:how, locus:s.locus}; used[j] = true; }
+        s.words.forEach(function(w,k){ if(same(gots[k],w) || isSyn(gots[k],w)) take(k,k); });
+        s.words.forEach(function(w,k){ if(res[k].ok) return; for(var j=0;j<gots.length;j++){ if(!used[j] && (same(gots[j],w) || isSyn(gots[j],w))){ take(k,j); return; } } });
+        s.words.forEach(function(w,k){ if(res[k].ok) return; if(!used[k]){ res[k].got = gots[k]; used[k] = true; return; } for(var j=0;j<gots.length;j++){ if(!used[j]){ res[k].got = gots[j]; used[j] = true; return; } } });
+        res.forEach(function(r){ if(r.ok) ok++; rows.push(r); });
+      });
+      var old = S.words.level, lvl = levelFor(ok, W.N, old);
       S.words.level = lvl;
       S.words.hist.push({d:todayStr(), n:W.N, ok:ok, s:S.words.secs, ts:Date.now()});
       dayLog().w++; addMinutes(Date.now()-W.t0); save();
-      W = {phase:"result", rows:rows, ok:ok, N:W.N, old:old, lvl:lvl};
+      W = {phase:"result", rows:rows, ok:ok, N:W.N, old:old, lvl:lvl, hi:S.words.hist.length-1};
       renderPalabras();
     };
     return;
@@ -609,10 +640,19 @@ function renderPalabras(){
     var msg = W.lvl>W.old ? "Subes a "+W.lvl+" palabras." : W.lvl<W.old ? "Bajas a "+W.lvl+" palabras para consolidar." : "Te quedas en "+W.lvl+" palabras.";
     var h3 = '<section class="view"><div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+W.ok+'<span class="muted" style="font-size:1.2rem"> / '+W.N+'</span></div></div><p class="muted">'+msg+'</p></div>';
     h3 += '<div>';
-    W.rows.forEach(function(r){ h3 += '<div class="res"><span>'+esc(r.want)+'</span><span class="'+(r.ok?'ok':'bad')+'">'+esc(r.got||"vacío")+'</span><span class="'+(r.ok?'ok':'bad')+'">'+(r.ok?'✓':'✗')+'</span></div>'; });
+    W.rows.forEach(function(r,i){
+      var mark = r.ok ? '<span class="ok">✓</span>' : (norm(r.got) ? '<button class="btn small ghost" data-ov="'+i+'">Contar</button>' : '<span class="bad">✗</span>');
+      h3 += '<div class="res"><span>'+esc(r.want)+'</span><span class="'+(r.ok?'ok':'bad')+'">'+esc(r.got||"vacío")+(r.how?' <span class="how">'+esc(r.how)+'</span>':'')+'</span>'+mark+'</div>';
+    });
     h3 += '</div><div class="row"><button class="btn primary" id="again">Otra ronda</button><button class="btn" id="home">Volver a Hoy</button></div>';
-    h3 += '<p class="small muted">Mira los fallos: casi siempre son lugares donde la imagen fue débil o el lugar se parecía a otro. Refuerza esa estación del palacio.</p></div></section>';
+    h3 += '<p class="small muted">Dentro de un mismo lugar el orden no importa, y los sinónimos comunes cuentan solos. Si escribiste algo equivalente que no se reconoció, toca Contar. Los fallos que quedan casi siempre son imágenes débiles o lugares parecidos entre sí: refuerza esa estación.</p></div></section>';
     view.innerHTML = h3;
+    view.querySelectorAll("[data-ov]").forEach(function(b){ b.onclick = function(){
+      var r = W.rows[+b.getAttribute("data-ov")]; r.ok = true; r.how = "contada por ti"; W.ok++;
+      W.lvl = levelFor(W.ok, W.N, W.old); S.words.level = W.lvl;
+      if(S.words.hist[W.hi]) S.words.hist[W.hi].ok = W.ok;
+      save(); renderPalabras();
+    }; });
     document.getElementById("again").onclick = function(){ W={phase:"setup"}; renderPalabras(); };
     document.getElementById("home").onclick = function(){ W={phase:"setup"}; go("hoy"); };
   }
