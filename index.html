@@ -144,6 +144,24 @@ svg text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
   .daybar .stat b{font-size:1.4rem}
   h1{font-size:1.8rem}
 }
+/* Observador */
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px}
+.icell{display:grid;place-items:center;padding:4px}
+.ibtn,.ccell{appearance:none;border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:4px;display:grid;place-items:center;cursor:pointer;min-height:52px}
+.ibtn.sel,.ccell.sel{border-color:var(--accent);background:var(--soft)}
+.ibtn.hit,.ccell.hit{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--surface))}
+.ibtn.miss,.ccell.miss{border-color:var(--brass);border-style:dashed}
+.ibtn.fa,.ccell.fa{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
+.ibtn.dim{opacity:.4}
+.ibtn:disabled,.ccell:disabled{cursor:default}
+.cgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:320px;width:100%;margin:0 auto}
+.cgrid .ccell{aspect-ratio:1;min-height:0}
+div.ccell{cursor:default}
+.dows{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.badge{font:600 .68rem var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);background:var(--accent);border-radius:20px;padding:2px 7px;vertical-align:middle;margin-left:4px}
+.check.sug{border-color:var(--accent)}
+.lesson summary{cursor:pointer;font-weight:600;padding:6px 0}
+.lesson .prose{padding-top:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -162,6 +180,7 @@ svg text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
     <button class="tab" role="tab" data-tab="palabras">Palabras</button>
     <button class="tab" role="tab" data-tab="numeros">Números</button>
     <button class="tab" role="tab" data-tab="mayor">Sistema mayor</button>
+    <button class="tab" role="tab" data-tab="obs">Observador</button>
     <button class="tab" role="tab" data-tab="progreso">Progreso</button>
   </nav>
   <main id="view"></main>
@@ -193,7 +212,7 @@ function defaults(){
   return { v:1, start: todayStr(),
     palaces:[{id:"p1", name:"Mi casa (ejemplo)", loci:EXAMPLE_LOCI.slice()}], active:"p1",
     words:{level:10, secs:8, hist:[]}, nums:{level:10, hist:[]},
-    major:{t:{}, c:{}}, log:{} };
+    major:{t:{}, c:{}}, log:{}, obs:obsDefaults() };
 }
 function load(){
   try{ var r = localStorage.getItem(KEY); if(r){ var o = JSON.parse(r); var d = defaults(); for(var k in d){ if(!(k in o)) o[k]=d[k]; } return o; } }catch(e){}
@@ -201,7 +220,7 @@ function load(){
 }
 var S = load();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
-function dayLog(d){ d = d || todayStr(); if(!S.log[d]) S.log[d] = {min:0,w:0,n:0,m:0}; return S.log[d]; }
+function dayLog(d){ d = d || todayStr(); if(!S.log[d]) S.log[d] = {min:0,w:0,n:0,m:0,o:0}; return S.log[d]; }
 function addMinutes(ms){ var l = dayLog(); l.min = Math.round((l.min + ms/60000)*10)/10; }
 
 /* ---------- helpers ---------- */
@@ -237,7 +256,7 @@ function weekNum(){ return Math.floor(Math.max(0,daysBetween(S.start, todayStr()
 function phase(){ var w=weekNum(), p=PHASES[0]; for(var i=0;i<PHASES.length;i++) if(w>=PHASES[i].w) p=PHASES[i]; return p; }
 function streak(){
   var d = todayStr(), n = 0;
-  function active(x){ var l=S.log[x]; return l && (l.w+l.n+l.m)>0; }
+  function active(x){ var l=S.log[x]; return l && (l.w+l.n+l.m+(l.o||0))>0; }
   if(!active(d)) d = addDays(d,-1);
   while(active(d)){ n++; d = addDays(d,-1); }
   return n;
@@ -260,7 +279,7 @@ function go(tab){
   for(var i=0;i<tabs.length;i++) tabs[i].setAttribute("aria-selected", tabs[i].getAttribute("data-tab")===tab ? "true":"false");
   header();
   if(tab==="guia" && !S.seenGuide){ S.seenGuide = true; save(); }
-  ({hoy:renderHoy, guia:renderGuia, sync:renderSync, palacio:renderPalacio, palabras:renderPalabras, numeros:renderNumeros, mayor:renderMayor, progreso:renderProgreso})[tab]();
+  ({hoy:renderHoy, guia:renderGuia, sync:renderSync, palacio:renderPalacio, palabras:renderPalabras, numeros:renderNumeros, mayor:renderMayor, obs:renderObs, progreso:renderProgreso})[tab]();
   try{ localStorage.setItem(KEY+".tab", tab); }catch(e){}
 }
 document.getElementById("tabs").addEventListener("click", function(e){ var t=e.target.closest(".tab"); if(t) go(t.getAttribute("data-tab")); });
@@ -374,13 +393,22 @@ function mergeState(a, b){
   for(var c in bc){ var oc = out.major.c[c]; if(!oc || bc[c].due > oc.due) out.major.c[c] = bc[c]; }
   for(var d in (b.log||{})){
     var ol = out.log[d] || {min:0,w:0,n:0,m:0}, bl = b.log[d];
-    out.log[d] = {min:Math.max(ol.min,bl.min||0), w:Math.max(ol.w,bl.w||0), n:Math.max(ol.n,bl.n||0), m:Math.max(ol.m,bl.m||0)};
+    out.log[d] = {min:Math.max(ol.min,bl.min||0), w:Math.max(ol.w,bl.w||0), n:Math.max(ol.n,bl.n||0), m:Math.max(ol.m,bl.m||0), o:Math.max(ol.o||0,bl.o||0)};
   }
+  var oa = a.obs || obsDefaults(), ob = b.obs || obsDefaults(), od = obsDefaults();
+  out.obs = {field:mergeHist(oa.field||[], ob.field||[]), stride:oa.stride || ob.stride || 0};
+  Object.keys(od).forEach(function(k){
+    if(k==="field" || k==="stride") return;
+    var x = oa[k] || od[k], y = ob[k] || od[k], o = JSON.parse(JSON.stringify(od[k]));
+    o.hist = mergeHist(x.hist||[], y.hist||[]);
+    if("level" in od[k]) o.level = Math.max(x.level||1, y.level||1);
+    out.obs[k] = o;
+  });
   return out;
 }
 var syncMsg = "", syncPending = null;
 function renderSync(){
-  var days = 0; for(var d in S.log){ if(S.log[d].w+S.log[d].n+S.log[d].m>0) days++; }
+  var days = 0; for(var d in S.log){ if(S.log[d].w+S.log[d].n+S.log[d].m+(S.log[d].o||0)>0) days++; }
   var h = '<section class="view">';
   h += '<div class="panel"><h2>Guardar y recuperar progreso</h2><p class="muted">Tu progreso vive solo en este navegador. Para pasarlo a otro dispositivo, o tener una copia por si se borra, usa un código de texto.</p>'
     + '<p class="small muted">Ahora tienes: <span class="mono">'+S.palaces.length+'</span> palacio(s), <span class="mono">'+days+'</span> días entrenados, <span class="mono">'+(S.words.hist.length+S.nums.hist.length)+'</span> rondas y <span class="mono">'+majorFilled()+'</span> entradas en tu tabla.</p></div>';
@@ -436,7 +464,8 @@ function renderHoy(){
   else blocks.push({done:false, t:"Sistema mayor", d:"Toca en la semana 2. Puedes adelantarte y empezar tu tabla.", prog:"", tab:"mayor", locked:true});
   if(numsTarget) blocks.push({done:l.n>=numsTarget, t:"Números", d:"1 ronda · unos 5 min", prog:l.n+" de "+numsTarget, tab:"numeros"});
   else blocks.push({done:false, t:"Números", d:"Toca en la semana 3. Puedes probar una ronda sin tabla.", prog:"", tab:"numeros", locked:true});
-  var reqDone = blocks.every(function(b){ return b.locked || b.done; });
+  blocks.push({done:(l.o||0)>=2, t:"Observador (opcional)", d:"Dos ejercicios de observación o estimación · unos 5 min", prog:(l.o||0)+" de 2", tab:"obs", opt:true});
+  var reqDone = blocks.every(function(b){ return b.locked || b.done || b.opt; });
 
   var h = '<section class="view">';
   if(!S.seenGuide) h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>Primera vez</h3><p>Lee la guía antes de empezar: qué es un palacio de la memoria y cómo se usa. Son unos 5 minutos.</p></div><button class="btn primary" data-go="guia">Leer la guía</button></div></div>';
@@ -785,6 +814,888 @@ function mark(k, ok){
   S.major.c[k] = c; dayLog().m++; save(); renderQuiz();
 }
 
+/* ---------- OBSERVADOR ---------- */
+var FERMI = [
+  ["¿Cuántas personas viven en el mundo?", 8.1e9, "personas", "Aprox. 8100 millones en 2024."],
+  ["¿Cuántos kilómetros hay de la Tierra a la Luna, en promedio?", 384400, "km", "Unos 384 400 km; la luz tarda poco más de 1 segundo."],
+  ["¿Cuántos kilómetros hay de la Tierra al Sol?", 1.5e8, "km", "Unos 150 millones de km: 1 unidad astronómica."],
+  ["¿Cuántos kilómetros mide la circunferencia de la Tierra en el ecuador?", 40075, "km", "40 075 km. El metro se definió originalmente a partir de esta medida."],
+  ["¿Cuántos metros de altura tiene el Everest?", 8849, "m", "8849 m según la medición conjunta de China y Nepal de 2020."],
+  ["¿Cuántos metros de profundidad tiene el punto más hondo de la Fosa de las Marianas?", 10900, "m", "Unos 10 900 m en el Abismo Challenger."],
+  ["¿Cuántos kilómetros por segundo recorre la luz en el vacío?", 299792, "km/s", "299 792 km/s, casi 300 000."],
+  ["¿Cuántos metros por segundo recorre el sonido en el aire a temperatura ambiente?", 343, "m/s", "Unos 343 m/s a 20 °C, por eso el truco del rayo: unos 3 segundos por kilómetro."],
+  ["¿Cuántos kilómetros mide el río Nilo?", 6650, "km", "Unos 6650 km; compite con el Amazonas por el primer lugar según cómo se mida."],
+  ["¿Cuántos kilómetros cuadrados tiene Rusia?", 1.71e7, "km²", "Unos 17,1 millones de km², el país más grande del mundo."],
+  ["¿Cuántas personas viven en China?", 1.41e9, "personas", "Unos 1410 millones; India la superó en 2023."],
+  ["¿Cuántos huesos tiene un adulto?", 206, "huesos", "206. Un recién nacido tiene cerca de 300 que luego se fusionan."],
+  ["¿Cuántas veces late el corazón de un adulto en un día?", 100000, "latidos", "Unos 100 000 a 70 latidos por minuto."],
+  ["¿Cuántas veces respira un adulto en un día?", 20000, "respiraciones", "Unas 20 000 a 14 por minuto en reposo."],
+  ["¿Cuántos años tiene el universo?", 1.38e10, "años", "Unos 13 800 millones de años."],
+  ["¿Cuántos años tiene la Tierra?", 4.54e9, "años", "Unos 4540 millones de años."],
+  ["¿Cuántos países son miembros de la ONU?", 193, "países", "193 miembros plenos."],
+  ["¿Cuántos metros mide la Torre Eiffel?", 330, "m", "Unos 330 m con antenas. Crece unos centímetros en verano por dilatación."],
+  ["¿Cuántos metros mide el Burj Khalifa?", 828, "m", "828 m, el edificio más alto del mundo desde 2010."],
+  ["¿Cuántos kilómetros miden en total todas las secciones de la Gran Muralla China?", 21196, "km", "21 196 km según el estudio oficial chino de 2012."],
+  ["¿Cuántos kilómetros de diámetro tiene la Tierra?", 12742, "km", "Unos 12 742 km en promedio."],
+  ["¿Cuántos kilómetros de diámetro tiene el Sol?", 1.39e6, "km", "Unos 1,39 millones de km: cabrían unas 109 Tierras en fila."],
+  ["¿Cuántos grados Celsius hay en la superficie del Sol?", 5500, "°C", "Unos 5500 °C en la fotosfera."],
+  ["¿Cuántos grados Celsius hay en el núcleo del Sol?", 1.5e7, "°C", "Unos 15 millones de °C."],
+  ["¿Cuántos elementos tiene la tabla periódica?", 118, "elementos", "118 confirmados."],
+  ["¿Cuántas teclas tiene un piano estándar?", 88, "teclas", "88: 52 blancas y 36 negras."],
+  ["¿Cuántas toneladas puede pesar una ballena azul adulta grande?", 150, "toneladas", "Hasta unas 150 toneladas, el animal más pesado que ha existido."],
+  ["¿Cuántos kilómetros por hora alcanza un guepardo en carrera?", 110, "km/h", "Entre 100 y 120 km/h en tramos cortos."],
+  ["¿Cuántos litros de agua tiene una piscina olímpica?", 2.5e6, "litros", "50 × 25 × 2 m = 2500 m³ = 2,5 millones de litros."],
+  ["¿Cuántos idiomas se hablan hoy en el mundo?", 7100, "idiomas", "Unos 7100 según Ethnologue; muchos están en peligro."],
+  ["¿Cuántas personas viven en el área metropolitana de Tokio?", 3.7e7, "personas", "Unos 37 millones, la mayor del mundo según la ONU."],
+  ["¿Cuántos kilómetros cuadrados tiene Brasil?", 8.5e6, "km²", "Unos 8,5 millones de km², casi la mitad de Sudamérica."],
+  ["¿Cuántos kilómetros mide el río Amazonas?", 6400, "km", "Unos 6400 km, y es por mucho el de mayor caudal."],
+  ["¿Cuántos metros de altura tiene el Monte Fuji?", 3776, "m", "3776 m."],
+  ["¿A cuántos kilómetros de altura orbita la Estación Espacial Internacional?", 400, "km", "Unos 400 km, menos que la distancia San José a Managua."],
+  ["¿Cuántos kilómetros por hora viaja la Estación Espacial Internacional?", 28000, "km/h", "Unos 28 000 km/h: una vuelta a la Tierra cada 90 minutos."],
+  ["¿Cuántos segundos tarda la luz del Sol en llegar a la Tierra?", 499, "segundos", "Unos 499 s, poco más de 8 minutos."],
+  ["¿Cuántas neuronas tiene el cerebro humano?", 8.6e10, "neuronas", "Unos 86 000 millones."],
+  ["¿Cuántos litros de sangre tiene un adulto?", 5, "litros", "Entre 4,5 y 5,5 litros."],
+  ["¿Cuántos pelos tiene una cabeza humana promedio?", 100000, "pelos", "Unos 100 000; varía según el color del cabello."],
+  ["¿Cuántos kilómetros cúbicos de agua hay en toda la Tierra?", 1.39e9, "km³", "Unos 1390 millones de km³; el 97% es salada."],
+  ["¿Qué porcentaje de la superficie terrestre cubren los océanos?", 71, "%", "Un 71%."],
+  ["¿Cuántos minutos tiene un año?", 525600, "minutos", "525 600 en un año no bisiesto."],
+  ["¿Cuántos segundos tiene un día?", 86400, "segundos", "24 × 60 × 60 = 86 400."],
+  ["¿Cuántos días tarda Marte en dar la vuelta al Sol?", 687, "días", "687 días terrestres."],
+  ["¿Cuántos kilogramos pesa un elefante africano macho adulto?", 6000, "kg", "Unos 6000 kg, a veces más."],
+  ["¿Cuántos kilómetros por hora vuela un avión comercial en crucero?", 900, "km/h", "Entre 850 y 950 km/h."],
+  ["¿A cuántos años luz está Próxima Centauri, la estrella más cercana después del Sol?", 4.24, "años luz", "4,24 años luz, unos 40 billones de km."],
+  ["¿Cuántas estrellas tiene la Vía Láctea?", 2e11, "estrellas", "Entre 100 000 y 400 000 millones; se usa 200 000 millones como valor central."],
+  ["¿Cuántos metros mide la Estatua de la Libertad con su pedestal?", 93, "m", "Unos 93 m desde el suelo hasta la antorcha."],
+  ["¿Cuántos kilómetros mide el Canal de Panamá?", 82, "km", "Unos 82 km de océano a océano."],
+  ["¿Cuántos metros de caída tiene el Salto Ángel en Venezuela?", 979, "m", "979 m, la cascada más alta del mundo."],
+  ["¿Cuántas personas han caminado sobre la Luna?", 12, "personas", "12, todas en misiones Apolo entre 1969 y 1972."],
+  ["¿Cuántas palabras tiene el Diccionario de la lengua española de la RAE?", 93000, "entradas", "Unas 93 000 entradas en la 23.ª edición."],
+  ["¿Cuántos metros medía originalmente la Gran Pirámide de Guiza?", 146, "m", "Unos 146 m; hoy unos 139 m por la pérdida de la cúspide."],
+  ["¿Cuántos espectadores cabían en el Coliseo romano?", 50000, "personas", "Unos 50 000."],
+  ["¿Cuántos años duró la Guerra de los Cien Años?", 116, "años", "116, de 1337 a 1453."],
+  ["¿Cuántos kilómetros cuadrados tiene Australia?", 7.7e6, "km²", "Unos 7,7 millones de km²."],
+  ["¿Cuántos dientes tiene un adulto con dentadura completa?", 32, "dientes", "32, contando las cordales."],
+  ["¿Cuántos kilómetros hay de la Tierra a Marte en su máximo acercamiento?", 5.46e7, "km", "Unos 54,6 millones de km; en promedio está mucho más lejos."],
+  ["¿Cuántas personas viven en Costa Rica?", 5.2e6, "personas", "Unos 5,2 millones."],
+  ["¿Cuántos metros de altura tiene el Cerro Chirripó?", 3821, "m", "3821 m, el punto más alto de Costa Rica."],
+  ["¿Cuántos kilómetros cuadrados tiene Costa Rica?", 51100, "km²", "Unos 51 100 km² de territorio continental."],
+  ["¿Cuántos metros de altura tiene el volcán Irazú?", 3432, "m", "3432 m, el volcán más alto de Costa Rica."]
+];
+var CLOCK_RANGES = [null,[5,20],[15,45],[30,90],[60,180]];
+var FIELD = {
+  pasos:{t:"Distancia a pasos", d:"Estima la distancia y luego camínala contando pasos.", kind:"steps", u:"m"},
+  altura:{t:"Altura", d:"Edificio, poste o árbol. Verifica con pisos × 3 m, una app o la sombra.", kind:"ratio", u:"m"},
+  conteo:{t:"Conteo", d:"Personas en un lugar, carros en una fila, objetos.", kind:"ratio", u:""},
+  hora:{t:"Hora sin reloj", d:"Di qué hora crees que es antes de ver el celular.", kind:"time", u:"min"},
+  retrato:{t:"Retrato de 10 segundos", d:"Detalles correctos de 5: ropa, manos, zapatos, qué carga, un rasgo.", kind:"score", u:"de 5"},
+  otra:{t:"Otra estimación", d:"Cualquier cosa con valor real verificable.", kind:"ratio", u:""}
+};
+var Ob = {mode:"menu"};
+
+function obsDefaults(){ return {clock:{level:1, good:0, hist:[]}, fermi:{hist:[]}, kim:{level:1, hist:[]}, change:{level:1, hist:[]}, flash:{level:1, good:0, hist:[]}, eye:{level:1, good:0, hist:[]}, calib:{hist:[]}, dow:{level:1, good:0, bad:0, hist:[]}, field:[], stride:0}; }
+function obs(){ if(!S.obs) S.obs = obsDefaults(); var d = obsDefaults(); for(var k in d){ if(!(k in S.obs)) S.obs[k] = d[k]; } return S.obs; }
+function avg(a){ return a.length ? a.reduce(function(s,x){return s+x;},0)/a.length : null; }
+function fmtNum(n){
+  if(n==null || !isFinite(n)) return "?";
+  var a = Math.abs(n);
+  if(a>=1e9) return (n/1e9).toLocaleString("es-CR",{maximumFractionDigits:2})+" mil millones";
+  if(a>=1e6) return (n/1e6).toLocaleString("es-CR",{maximumFractionDigits:2})+" millones";
+  return n.toLocaleString("es-CR",{maximumFractionDigits:2});
+}
+function parseNum(str){
+  var s = norm(str), mult = 1, n;
+  if(!s) return NaN;
+  var sci = s.match(/(\d+(?:[.,]\d+)?)\s*(?:e|x\s*10\^?)\s*([+-]?\d+)/);
+  if(sci) return parseFloat(sci[1].replace(",", "."))*Math.pow(10, +sci[2]);
+  if(/mil millones/.test(s)){ mult = 1e9; s = s.replace(/mil millones/,""); }
+  else if(/billon/.test(s)){ mult = 1e12; }
+  else if(/millon/.test(s)){ mult = 1e6; }
+  else if(/\bmil\b/.test(s)){ mult = 1e3; }
+  else if(/\d\s*k\b/.test(s)){ mult = 1e3; }
+  s = s.replace(/[^0-9.,]/g,"");
+  if(!s) return mult>1 ? mult : NaN;
+  if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g,"");
+  else if(/^\d{1,3}(\.\d{3}){2,}(,\d+)?$/.test(s) || /^\d{1,3}\.\d{3},\d+$/.test(s)) s = s.replace(/\./g,"").replace(",",".");
+  else if(/^\d{1,3}(\.\d{3})$/.test(s) && mult===1) s = s.replace(/\./g,"");
+  else s = s.replace(",",".");
+  n = parseFloat(s);
+  return isFinite(n) ? n*mult : NaN;
+}
+function relErr(est, real){ return real ? Math.abs(est-real)/Math.abs(real)*100 : null; }
+function logErr(est, real){ return (est>0 && real>0) ? Math.abs(Math.log10(est/real)) : null; }
+function fermiLabel(e){ return e<0.05 ? "Clavado" : e<0.15 ? "Muy cerca" : e<0.3 ? "Cerca" : e<1 ? "Mismo orden de magnitud" : e<2 ? "Fallaste por más de 10 veces" : "Fallaste por más de 100 veces"; }
+function timeToMin(t){ var p = String(t||"").split(":"); return p.length===2 ? (+p[0])*60 + (+p[1]) : NaN; }
+function nowHM(){ var d = new Date(); return pad2(d.getHours())+":"+pad2(d.getMinutes()); }
+function obsDone(){ var l = dayLog(); l.o = (l.o||0) + 1; }
+
+var OBS_LIST = [
+  ["clock","Reloj interno","Detén el cronómetro cuando creas que pasó el tiempo pedido."],
+  ["kim","Juego de Kim","Memoriza figuras y reconócelas entre otras parecidas."],
+  ["change","¿Qué cambió?","Encuentra las diferencias entre dos vistas de la misma cuadrícula."],
+  ["flash","Conteo flash","Estima cuántos puntos viste en un instante."],
+  ["eye","Ojo métrico","Estima longitudes, ángulos y proporciones."],
+  ["fermi","Estimación Fermi","Preguntas del mundo real; descompón y da un número."],
+  ["calib","Calibración","Rangos del 90% y verdadero o falso con seguridad."],
+  ["dow","Día de la semana","Calcula de cabeza qué día de la semana cae cualquier fecha."],
+  ["field","Registro de campo","Anota lo que estimaste en la calle y el valor real."]
+];
+function obsMeta(k){
+  var O = obs(), X = O[k], last;
+  if(k==="clock"){ last = avg(X.hist.slice(-10).map(function(h){ return h.err; })); return "Nivel "+X.level+(last==null?"":" · error medio "+Math.round(last)+"%"); }
+  if(k==="flash" || k==="eye"){ last = avg(X.hist.slice(-10).map(function(h){ return h.err; })); return "Nivel "+X.level+(last==null?"":" · error medio "+Math.round(last)+(k==="eye"?"":"%")); }
+  if(k==="kim" || k==="change"){ last = avg(X.hist.slice(-10).map(function(h){ return h.acc*100; })); return "Nivel "+X.level+(last==null?"":" · precisión "+Math.round(last)+"%"); }
+  if(k==="fermi"){ last = avg(X.hist.slice(-10).map(function(h){ return h.err; })); return X.hist.length+" de "+FERMI.length+" respondidas"+(last==null?"":" · error log "+last.toFixed(2)); }
+  if(k==="calib"){ var cs = calibStats(); return (cs.rangeHit==null?"Sin rangos aún":"Rangos "+Math.round(cs.rangeHit)+"% (meta 90%)")+(cs.brier==null?"":" · Brier "+cs.brier.toFixed(3)); }
+  if(k==="dow"){ var ok = X.hist.filter(function(h){ return h.ok; }).slice(-10); return "Nivel "+X.level+(ok.length?" · "+avg(ok.map(function(h){ return h.secs; })).toFixed(1)+" s por acierto":""); }
+  if(k==="field") return O.field.filter(function(e){ return e.k!=="stride"; }).length+" registros"+(O.stride?" · zancada "+O.stride.toFixed(2)+" m":" · calibra tu zancada");
+  return "";
+}
+function renderObs(){
+  var R = {clock:renderClock, fermi:renderFermi, field:renderField, kim:renderKim, change:renderChange, flash:renderFlash, eye:renderEye, calib:renderCalib, dow:renderDow};
+  if(Ob.mode!=="menu" && R[Ob.mode]) return R[Ob.mode]();
+  var wd = new Date().getDay(), sug = ROUTINE[wd] || [], l = dayLog();
+  var h = '<section class="view">';
+  h += '<div class="panel"><h2>Observador</h2><p class="muted">Entrena observar, estimar y razonar con números. La regla es siempre la misma: <b>estima, anota, verifica</b>. Sin comparar contra el valor real no hay mejora, solo confianza.</p>'
+    + '<p class="small muted">Hoy llevas <b class="mono">'+(l.o||0)+'</b> ejercicio'+((l.o||0)===1?'':'s')+'. '
+    + (wd===6 ? 'Los sábados toca el ejercicio que peor te vaya.' : wd===0 ? 'Los domingos son de descanso: revisa tus gráficas en Progreso.' : 'Sugeridos para hoy: '+sug.map(function(k){ return OBS_LIST.filter(function(o){ return o[0]===k; })[0][1]; }).join(" y ")+'.')+'</p></div>';
+  h += '<div class="panel"><div class="blocks">';
+  OBS_LIST.forEach(function(o){
+    var on = sug.indexOf(o[0])>=0;
+    h += '<div class="block"><div class="check'+(on?' sug':'')+'"></div><div><div style="font-weight:600">'+esc(o[1])+(on?' <span class="badge">hoy</span>':'')+'</div><div class="muted small">'+esc(o[2])+'</div><div class="small mono" style="color:var(--brass)">'+esc(obsMeta(o[0]))+'</div></div><button class="btn small" data-om="'+o[0]+'">Ir</button></div>';
+  });
+  h += '</div></div>';
+  h += '<div class="panel"><h3>Cómo medir tu error</h3><p class="small muted">Reloj, conteo y campo usan error relativo: cuánto te alejaste en porcentaje del valor real. Fermi usa error logarítmico: 0 es exacto, 0,3 es fallar por el doble y 1 es fallar por 10 veces. Kim y ¿Qué cambió? usan precisión neta: aciertos menos falsas alarmas. La dificultad sube sola cuando lo haces bien de forma constante.</p></div>';
+  h += '</section>';
+  view.innerHTML = h;
+  view.querySelectorAll("[data-om]").forEach(function(b){ b.onclick = function(){ Ob = {mode:b.getAttribute("data-om"), phase:"setup"}; renderObs(); }; });
+}
+function obsBack(){ return '<button class="btn small ghost" id="obBack">Volver a Observador</button>'; }
+function wireBack(){ var b = document.getElementById("obBack"); if(b) b.onclick = function(){ stopTimer(); Ob = {mode:"menu"}; renderObs(); }; }
+
+function renderClock(){
+  var C = obs().clock;
+  if(Ob.phase==="setup"){
+    var r = CLOCK_RANGES[C.level];
+    Ob.target = r[0] + Math.floor(Math.random()*(r[1]-r[0]+1));
+    Ob.phase = "ready";
+  }
+  if(Ob.phase==="ready" || Ob.phase==="running"){
+    var running = Ob.phase==="running";
+    view.innerHTML = '<section class="view"><div class="panel"><div class="stage">'
+      + '<div class="where">Reloj interno · nivel '+C.level+'</div>'
+      + '<div class="word mono">'+Ob.target+' s</div>'
+      + '<p class="muted small">'+(running ? 'Contando. Detén cuando creas que pasaron '+Ob.target+' segundos.' : 'Presiona Iniciar y luego Detener cuando creas que pasaron '+Ob.target+' segundos. No verás ningún reloj.')+'</p>'
+      + '<button class="btn primary" id="clkBtn" style="min-width:200px;padding:22px 16px;font-size:1.1rem">'+(running?'Detener':'Iniciar')+'</button>'
+      + '</div>'+obsBack()+'</div></section>';
+    wireBack();
+    document.getElementById("clkBtn").onclick = function(){
+      if(Ob.phase==="ready"){ Ob.t0 = performance.now(); Ob.phase = "running"; renderClock(); return; }
+      var got = (performance.now()-Ob.t0)/1000, err = relErr(got, Ob.target), old = C.level;
+      if(err<=10){ C.good = (C.good||0)+1; if(C.good>=2 && C.level<CLOCK_RANGES.length-1){ C.level++; C.good=0; } }
+      else { C.good = 0; if(err>25 && C.level>1) C.level--; }
+      C.hist.push({d:todayStr(), ts:Date.now(), target:Ob.target, got:Math.round(got*100)/100, err:Math.round(err*10)/10});
+      obsDone(); addMinutes(got*1000); save();
+      Ob = {mode:"clock", phase:"result", target:Ob.target, got:got, err:err, old:old};
+      renderClock();
+    };
+    return;
+  }
+  var diff = Ob.got-Ob.target;
+  var msg = C.level>Ob.old ? "Subes al nivel "+C.level+"." : C.level<Ob.old ? "Bajas al nivel "+C.level+"." : (Ob.err<=10 ? "Uno más así y subes de nivel." : "Sigues en el nivel "+C.level+".");
+  var last = C.hist.slice(-10).map(function(h){return h.err;});
+  view.innerHTML = '<section class="view"><div class="panel">'
+    + '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+Ob.got.toFixed(1)+'<span class="muted" style="font-size:1.2rem"> / '+Ob.target+' s</span></div></div><p class="muted">'+msg+'</p></div>'
+    + '<p>'+(Math.abs(diff)<0.5 ? 'Prácticamente exacto.' : (diff>0 ? 'Te pasaste ' : 'Te adelantaste ')+Math.abs(diff).toFixed(1)+' s.')+' Error de <b class="mono">'+Math.round(Ob.err)+'%</b>. '+(Ob.err<=10?'Excelente.':Ob.err<=25?'Bien.':'A seguir practicando.')+'</p>'
+    + '<p class="small muted">Error medio de tus últimas '+last.length+': <span class="mono">'+Math.round(avg(last))+'%</span>. Las personas sin práctica suelen fallar entre 15% y 30% en intervalos cortos; con práctica se baja de 10%.</p>'
+    + '<div class="row"><button class="btn primary" id="clkAgain">Otra</button>'+obsBack()+'</div></div></section>';
+  wireBack();
+  document.getElementById("clkAgain").onclick = function(){ Ob = {mode:"clock", phase:"setup"}; renderClock(); };
+}
+
+function pickFermi(){
+  var F = obs().fermi, seen = {};
+  F.hist.forEach(function(h){ seen[h.q] = (seen[h.q]||0)+1; });
+  var min = Infinity; FERMI.forEach(function(_,i){ min = Math.min(min, seen[i]||0); });
+  var pool = []; FERMI.forEach(function(_,i){ if((seen[i]||0)===min) pool.push(i); });
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function renderFermi(){
+  var F = obs().fermi;
+  if(Ob.phase==="setup"){ Ob.q = pickFermi(); Ob.phase = "ask"; Ob.t0 = Date.now(); Ob.msg = ""; }
+  var q = FERMI[Ob.q];
+  if(Ob.phase==="ask"){
+    view.innerHTML = '<section class="view"><div class="panel">'
+      + '<h3>Estimación Fermi</h3><h2>'+esc(q[0])+'</h2>'
+      + '<p class="small muted">Respuesta en <b>'+esc(q[2])+'</b>. Puedes escribir 2500000, 2,5 millones, 2.5e6 o 40 mil.</p>'
+      + '<input id="fIn" inputmode="decimal" autocomplete="off" class="mono" style="font-size:1.2rem">'
+      + '<p class="small" id="fPrev" style="min-height:1.2em;color:var(--muted)">'+esc(Ob.msg||"")+'</p>'
+      + '<div class="row"><button class="btn primary" id="fGo">Responder</button><button class="btn small ghost" id="fSkip">Otra pregunta</button>'+obsBack()+'</div>'
+      + '<p class="small muted">Si no sabes, no adivines al azar: parte de algo que sí sepas y multiplica o divide hasta llegar.</p>'
+      + '</div></section>';
+    wireBack();
+    var inp = document.getElementById("fIn"), prev = document.getElementById("fPrev");
+    inp.focus();
+    inp.oninput = function(){ var n = parseNum(inp.value); prev.textContent = inp.value ? (isFinite(n) ? "Se leerá como "+fmtNum(n)+" "+q[2] : "No entiendo ese número") : ""; };
+    function answer(){
+      var est = parseNum(inp.value);
+      if(!isFinite(est) || est<=0){ Ob.msg = "Escribe un número mayor que cero."; renderFermi(); return; }
+      var err = logErr(est, q[1]);
+      F.hist.push({d:todayStr(), ts:Date.now(), q:Ob.q, est:est, real:q[1], err:Math.round(err*1000)/1000});
+      obsDone(); addMinutes(Date.now()-Ob.t0); save();
+      Ob = {mode:"fermi", phase:"result", q:Ob.q, est:est, err:err};
+      renderFermi();
+    }
+    document.getElementById("fGo").onclick = answer;
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") answer(); });
+    document.getElementById("fSkip").onclick = function(){ Ob = {mode:"fermi", phase:"setup"}; renderFermi(); };
+    return;
+  }
+  var ratio = Ob.est/q[1];
+  function fx(r){ return r>=10 ? fmtNum(Math.round(r)) : r.toLocaleString("es-CR",{maximumFractionDigits:1}); }
+  var how = Math.abs(Math.log10(ratio))<0.02 ? "Prácticamente exacto." : ratio>1 ? "Te pasaste "+fx(ratio)+" veces." : "Te quedaste corto "+fx(1/ratio)+" veces.";
+  var last = F.hist.slice(-10).map(function(h){return h.err;});
+  view.innerHTML = '<section class="view"><div class="panel">'
+    + '<h3>'+esc(fermiLabel(Ob.err))+'</h3><h2>'+esc(q[0])+'</h2>'
+    + '<div class="res"><span class="muted">Tu estimación</span><span class="mono">'+esc(fmtNum(Ob.est))+' '+esc(q[2])+'</span><span></span></div>'
+    + '<div class="res"><span class="muted">Valor real</span><span class="mono">'+esc(fmtNum(q[1]))+' '+esc(q[2])+'</span><span></span></div>'
+    + '<div class="res"><span class="muted">Error log</span><span class="mono">'+Ob.err.toFixed(2)+'</span><span></span></div>'
+    + '<p>'+how+'</p><p class="small muted">'+esc(q[3])+'</p>'
+    + '<p class="small muted">Error medio de tus últimas '+last.length+': <span class="mono">'+avg(last).toFixed(2)+'</span>.</p>'
+    + '<div class="row"><button class="btn primary" id="fNext">Siguiente</button>'+obsBack()+'</div></div></section>';
+  wireBack();
+  document.getElementById("fNext").onclick = function(){ Ob = {mode:"fermi", phase:"setup"}; renderFermi(); };
+}
+
+function renderField(){
+  var O = obs();
+  var cat = Ob.cat || "pasos", f = FIELD[cat];
+  var h = '<section class="view">';
+  h += '<div class="panel"><h3>Calibrar zancada</h3>'
+    + (O.stride ? '<p>Tu zancada: <b class="mono">'+O.stride.toFixed(2)+' m</b> por paso. Recalibra cada 3 meses.</p>' : '<p class="muted small">Camina una distancia medida (una cancha, una pista o una ruta en un mapa) contando pasos normales. Mejor si repites 3 veces y usas el promedio.</p>')
+    + '<div class="row"><label class="small muted" style="flex:1 1 120px">Metros recorridos<input id="zM" inputmode="decimal" value="100"></label><label class="small muted" style="flex:1 1 120px">Pasos contados<input id="zP" inputmode="numeric"></label></div>'
+    + '<div class="row"><button class="btn small" id="zSave">Guardar zancada</button></div></div>';
+  h += '<div class="panel"><h3>Nuevo registro</h3><select id="fCat">'+Object.keys(FIELD).map(function(k){ return '<option value="'+k+'"'+(k===cat?' selected':'')+'>'+esc(FIELD[k].t)+'</option>'; }).join("")+'</select>'
+    + '<p class="small muted">'+esc(f.d)+'</p>';
+  if(f.kind==="steps"){
+    if(!O.stride) h += '<p class="small" style="color:var(--bad)">Primero calibra tu zancada arriba.</p>';
+    h += '<div class="row"><label class="small muted" style="flex:1 1 120px">Tu estimación (m)<input id="fEst" inputmode="decimal"></label><label class="small muted" style="flex:1 1 120px">Pasos al caminarla<input id="fReal" inputmode="numeric"></label></div>';
+  } else if(f.kind==="time"){
+    h += '<div class="row"><label class="small muted" style="flex:1 1 120px">Hora que creías<input id="fEst" type="time"></label><label class="small muted" style="flex:1 1 120px">Hora real<input id="fReal" type="time" value="'+nowHM()+'"></label></div>';
+  } else if(f.kind==="score"){
+    h += '<div class="row"><label class="small muted" style="flex:1 1 120px">Detalles correctos<select id="fEst">'+[0,1,2,3,4,5].map(function(n){return '<option>'+n+'</option>';}).join("")+'</select></label></div>';
+  } else {
+    h += '<div class="row"><label class="small muted" style="flex:1 1 120px">Tu estimación'+(f.u?' ('+f.u+')':'')+'<input id="fEst" inputmode="decimal"></label><label class="small muted" style="flex:1 1 120px">Valor real'+(f.u?' ('+f.u+')':'')+'<input id="fReal" inputmode="decimal"></label></div>';
+  }
+  h += '<input id="fNote" placeholder="Nota opcional: qué era, dónde">'
+    + '<div class="row"><button class="btn primary" id="fSave"'+(f.kind==="steps"&&!O.stride?' disabled':'')+'>Guardar</button>'+obsBack()+'</div>'
+    + (Ob.msg ? '<p class="toast">'+esc(Ob.msg)+'</p>' : '')
+    + '</div>';
+  var rows = O.field.filter(function(e){ return e.k!=="stride"; });
+  if(rows.length){
+    h += '<div class="panel"><h3>Tu precisión por tipo</h3>';
+    Object.keys(FIELD).forEach(function(k){
+      var es = rows.filter(function(e){return e.k===k;}).slice(-10);
+      if(!es.length) return;
+      var a = avg(es.map(function(e){return e.err;})), fk = FIELD[k].kind;
+      var txt = fk==="time" ? Math.round(a)+" min" : fk==="score" ? (5-a).toFixed(1)+" de 5" : Math.round(a)+"%";
+      h += '<div class="res"><span>'+esc(FIELD[k].t)+'</span><span class="mono">'+txt+'</span><span class="muted small mono">'+es.length+'</span></div>';
+    });
+    h += '<p class="small muted">Promedio de los últimos 10 de cada tipo. En hora es error en minutos; en distancias y conteos, error relativo.</p></div>';
+    h += '<div class="panel"><h3>Últimos registros</h3>';
+    rows.slice(-8).reverse().forEach(function(e){
+      var fk = FIELD[e.k] ? FIELD[e.k].kind : "ratio";
+      var a = fk==="time" ? e.est+" vs "+e.real : fk==="score" ? e.est+" de 5" : fmtNum(e.est)+" vs "+fmtNum(e.real);
+      var b = fk==="time" ? Math.round(e.err)+" min" : fk==="score" ? "" : Math.round(e.err)+"%";
+      h += '<div class="res"><span>'+esc(FIELD[e.k]?FIELD[e.k].t:e.k)+(e.note?' <span class="how">'+esc(e.note)+'</span>':'')+'</span><span class="mono small">'+esc(a)+'</span><span class="mono small">'+b+'</span></div>';
+    });
+    h += '</div>';
+  }
+  h += '</section>';
+  view.innerHTML = h;
+  Ob.msg = "";
+  wireBack();
+  document.getElementById("fCat").onchange = function(){ Ob.cat = this.value; renderField(); };
+  document.getElementById("zSave").onclick = function(){
+    var m = parseNum(document.getElementById("zM").value), p = parseNum(document.getElementById("zP").value);
+    if(!(m>0 && p>0)){ Ob.msg = "Escribe metros y pasos."; renderField(); return; }
+    O.stride = m/p; O.field.push({k:"stride", d:todayStr(), ts:Date.now(), m:m, p:p, stride:O.stride});
+    save(); Ob.msg = "Zancada guardada: "+O.stride.toFixed(2)+" m."; renderField();
+  };
+  document.getElementById("fSave").onclick = function(){
+    var eEl = document.getElementById("fEst"), rEl = document.getElementById("fReal");
+    var note = document.getElementById("fNote").value.trim(), rec = {k:cat, d:todayStr(), ts:Date.now(), note:note};
+    if(f.kind==="time"){
+      var a = timeToMin(eEl.value), b = timeToMin(rEl.value);
+      if(!isFinite(a) || !isFinite(b)){ Ob.msg = "Completa las dos horas."; renderField(); return; }
+      var dm = Math.abs(a-b); dm = Math.min(dm, 1440-dm);
+      rec.est = eEl.value; rec.real = rEl.value; rec.err = dm;
+    } else if(f.kind==="score"){
+      rec.est = +eEl.value; rec.real = 5; rec.err = 5 - rec.est;
+    } else {
+      var est = parseNum(eEl.value), real = parseNum(rEl.value);
+      if(f.kind==="steps") real = real * O.stride;
+      if(!(est>0 && real>0)){ Ob.msg = "Completa los dos valores con números mayores que cero."; renderField(); return; }
+      rec.est = est; rec.real = Math.round(real*100)/100; rec.err = Math.round(relErr(est, real)*10)/10;
+    }
+    O.field.push(rec); obsDone(); save();
+    Ob.msg = f.kind==="steps" ? "Guardado. Distancia real: "+fmtNum(rec.real)+" m, error "+Math.round(rec.err)+"%." : "Guardado.";
+    renderField();
+  };
+}
+
+/* ---------- OBSERVADOR: fases 2 a 4 ---------- */
+var SHAPES = ["circle","square","triangle","diamond","star","hexagon","cross","ring"];
+var COLORS = ["#E4572E","#F3A712","#29A36A","#2C7BE5","#8E44AD","#E84393","#14B8A6"];
+var DAYS = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+var MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+var DATES = [
+  ["¿En qué año imprimió Gutenberg su primera Biblia con tipos móviles?", 1455, "año"],
+  ["¿En qué año llegó Colón a América?", 1492, "año"],
+  ["¿En qué año se independizó Costa Rica de España?", 1821, "año"],
+  ["¿En qué año empezó la Revolución Francesa?", 1789, "año"],
+  ["¿En qué año empezó la Primera Guerra Mundial?", 1914, "año"],
+  ["¿En qué año cayó el Muro de Berlín?", 1989, "año"],
+  ["¿En qué año volaron por primera vez los hermanos Wright?", 1903, "año"],
+  ["¿En qué año llegó el ser humano a la Luna?", 1969, "año"],
+  ["¿En qué año nació Shakespeare?", 1564, "año"],
+  ["¿En qué año se fundó Google?", 1998, "año"],
+  ["¿En qué año salió el primer iPhone?", 2007, "año"],
+  ["¿En qué año patentó Graham Bell el teléfono?", 1876, "año"],
+  ["¿En qué año descubrió Fleming la penicilina?", 1928, "año"],
+  ["¿En qué año se hundió el Titanic?", 1912, "año"],
+  ["¿En qué año terminó la Segunda Guerra Mundial?", 1945, "año"],
+  ["¿En qué año se firmó la Declaración de Independencia de Estados Unidos?", 1776, "año"],
+  ["¿En qué año publicó Einstein la relatividad especial?", 1905, "año"],
+  ["¿En qué año publicó Darwin El origen de las especies?", 1859, "año"],
+  ["¿En qué año publicó Newton sus Principia?", 1687, "año"],
+  ["¿En qué año cayó Constantinopla ante los otomanos?", 1453, "año"],
+  ["¿En qué año se jugó el primer Mundial de fútbol?", 1930, "año"],
+  ["¿En qué año se lanzó el Sputnik?", 1957, "año"],
+  ["¿En qué año salió el Game Boy original?", 1989, "año"],
+  ["¿En qué año salió la primera PlayStation en Japón?", 1994, "año"],
+  ["¿En qué año se creó Tetris?", 1984, "año"],
+  ["¿En qué año se fundó Nintendo?", 1889, "año"],
+  ["¿En qué año salió Pac-Man?", 1980, "año"],
+  ["¿En qué año se publicó la primera parte del Quijote?", 1605, "año"],
+  ["¿En qué año se inauguró el Canal de Panamá?", 1914, "año"],
+  ["¿En qué año se abolió el ejército en Costa Rica?", 1948, "año"],
+  ["¿En qué año se lanzó el telescopio espacial Hubble?", 1990, "año"],
+  ["¿En qué año se publicó la World Wide Web al público?", 1991, "año"]
+];
+var TF = [
+  ["La Gran Muralla China se ve a simple vista desde la Luna.", false, "Es demasiado angosta; ni desde la órbita baja se distingue a simple vista con facilidad."],
+  ["Los murciélagos son ciegos.", false, "Todos ven; muchos además usan ecolocación."],
+  ["Australia es más ancha que el diámetro de la Luna.", true, "Australia mide unos 4000 km de este a oeste; la Luna, unos 3474 km de diámetro."],
+  ["Las abejas tienen cinco ojos.", true, "Dos ojos compuestos y tres ocelos en la parte superior de la cabeza."],
+  ["En Venus un día dura más que un año.", true, "Venus tarda unos 243 días terrestres en girar sobre sí mismo y 225 en orbitar el Sol."],
+  ["Napoleón era excepcionalmente bajo para su época.", false, "Medía alrededor de 1,69 m, normal para un francés de su tiempo."],
+  ["Los pulpos tienen tres corazones.", true, "Dos bombean sangre a las branquias y uno al resto del cuerpo."],
+  ["El sonido viaja más rápido en el agua que en el aire.", true, "Unos 1480 m/s en el agua contra 343 m/s en el aire."],
+  ["Cleopatra vivió más cerca en el tiempo de la llegada a la Luna que de la construcción de la Gran Pirámide.", true, "La pirámide es de hacia 2560 a. C.; Cleopatra murió en el 30 a. C."],
+  ["Los tiburones existen desde antes que los árboles.", true, "Los tiburones tienen unos 450 millones de años; los primeros árboles, unos 385 millones."],
+  ["La Torre Eiffel se construyó para la Exposición Universal de 1889.", true, "Se inauguró ese año para el centenario de la Revolución Francesa."],
+  ["La capital de Australia es Sídney.", false, "Es Canberra."],
+  ["Río de Janeiro es la capital de Brasil.", false, "Es Brasilia desde 1960."],
+  ["El oro es más denso que el plomo.", true, "El oro pesa unos 19,3 g/cm³; el plomo, unos 11,3."],
+  ["Los humanos solo usamos el 10% del cerebro.", false, "Es un mito; prácticamente todo el cerebro tiene actividad."],
+  ["Un rayo nunca cae dos veces en el mismo lugar.", false, "El Empire State recibe decenas de rayos al año."],
+  ["El sonido puede viajar por el espacio vacío.", false, "Necesita un medio; en el vacío no se propaga."],
+  ["Botánicamente, los bananos son bayas.", true, "El fruto se desarrolla de un solo ovario con semillas: es una baya."],
+  ["Botánicamente, las fresas son bayas.", false, "Son frutos agregados; las semillitas de afuera son los verdaderos frutos."],
+  ["Marte tiene dos lunas.", true, "Fobos y Deimos."],
+  ["El Sahara es el desierto más grande del mundo.", false, "Lo es la Antártida; el Sahara es el desierto cálido más grande."],
+  ["Hay más árboles en la Tierra que estrellas en la Vía Láctea.", true, "Unos 3 billones de árboles contra 100 000 a 400 000 millones de estrellas."],
+  ["El español tiene más hablantes nativos que el inglés.", true, "Unos 480 millones de nativos contra unos 380 millones."],
+  ["Japón tiene más de 6000 islas.", true, "Un recuento oficial de 2023 contó más de 14 000."],
+  ["La Antártida es el continente más seco.", true, "Gran parte recibe menos precipitación que muchos desiertos."],
+  ["El vidrio es un líquido que fluye muy lentamente.", false, "Es un sólido amorfo; los vitrales antiguos son irregulares por cómo se fabricaban."],
+  ["Hay pingüinos silvestres en el Polo Norte.", false, "Viven en el hemisferio sur; solo el de Galápagos llega apenas al norte del ecuador."],
+  ["El ADN de humanos y chimpancés coincide en más de un 95%.", true, "La similitud es de alrededor del 98%."],
+  ["El Canal de Panamá se inauguró en 1914.", true, "El 15 de agosto de 1914."],
+  ["La luz del Sol tarda unos 8 minutos en llegar a la Tierra.", true, "Unos 8 minutos y 20 segundos."],
+  ["Hay más personas vivas hoy que todas las que han muerto en la historia.", false, "Se estima que han vivido más de 100 000 millones de personas."],
+  ["El río Amazonas desemboca en el Pacífico.", false, "Desemboca en el Atlántico."],
+  ["Los gatos tienen más huesos que los humanos.", true, "Un gato tiene unos 230 a 250, contando la cola."],
+  ["La Universidad de Oxford es más antigua que el Imperio azteca.", true, "Oxford enseñaba desde 1096; Tenochtitlan se fundó hacia 1325."],
+  ["Mercurio es el planeta más caliente del sistema solar.", false, "Es Venus, por su atmósfera densa de CO₂."],
+  ["Los diamantes están hechos de carbono.", true, "Carbono puro con estructura cristalina."],
+  ["El Kilimanjaro está en Kenia.", false, "Está en Tanzania, cerca de la frontera con Kenia."],
+  ["La sangre sin oxígeno es azul dentro del cuerpo.", false, "Siempre es roja; las venas se ven azules por cómo la piel filtra la luz."],
+  ["Rusia tiene 11 husos horarios.", true, "Es el país con más husos horarios contiguos."],
+  ["Un chicle tragado tarda 7 años en digerirse.", false, "No se digiere, pero sale del cuerpo en pocos días."],
+  ["Los camellos guardan agua en sus jorobas.", false, "Guardan grasa."],
+  ["El animal que más muertes humanas causa al año es el mosquito.", true, "Por enfermedades como la malaria y el dengue."],
+  ["Pong fue el primer videojuego arcade comercial.", false, "Computer Space salió en 1971, un año antes."],
+  ["Nintendo se fundó antes de 1900.", true, "En 1889, como fabricante de cartas hanafuda."],
+  ["Super Mario Bros. salió originalmente en 1985.", true, "Para la Famicom, en septiembre de 1985."],
+  ["El Everest es la montaña más alta medida desde su base.", false, "Mauna Kea mide más de 10 000 m desde su base en el fondo del mar."],
+  ["Una cucharadita de estrella de neutrones pesaría miles de millones de toneladas.", true, "Su densidad es comparable a la de un núcleo atómico."],
+  ["El idioma oficial de Brasil es el español.", false, "Es el portugués."],
+  ["La lengua es el músculo más fuerte del cuerpo.", false, "Depende de cómo se mida, pero el masetero o el glúteo mayor la superan."],
+  ["El café es la segunda mercancía más comerciada del mundo después del petróleo.", false, "Es un mito; minerales, gas y granos lo superan."]
+];
+var FLASH = [null,[5,15],[10,40],[30,100],[60,200]], FLASH_MS = [null,1500,1000,800,600];
+var DOW_RANGE = [null,null,[1950,2049],[1900,2099],[1800,2199]];
+var ROUTINE = {1:["kim","clock"],2:["fermi","calib"],3:["change","flash"],4:["eye","dow"],5:["calib","kim"]};
+
+function shapeSVG(sh, col, cx, cy, r){
+  function pts(n, rot, rr){ var a=[]; for(var i=0;i<n;i++){ var t=rot+i*2*Math.PI/n; a.push((cx+rr*Math.cos(t)).toFixed(1)+","+(cy+rr*Math.sin(t)).toFixed(1)); } return a.join(" "); }
+  if(sh==="circle") return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+col+'"/>';
+  if(sh==="ring") return '<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*0.72)+'" fill="none" stroke="'+col+'" stroke-width="'+(r*0.45)+'"/>';
+  if(sh==="square") return '<rect x="'+(cx-r*0.85)+'" y="'+(cy-r*0.85)+'" width="'+(r*1.7)+'" height="'+(r*1.7)+'" rx="2" fill="'+col+'"/>';
+  if(sh==="triangle") return '<polygon points="'+pts(3,-Math.PI/2,r*1.15)+'" fill="'+col+'"/>';
+  if(sh==="diamond") return '<polygon points="'+pts(4,-Math.PI/2,r*1.1)+'" fill="'+col+'"/>';
+  if(sh==="hexagon") return '<polygon points="'+pts(6,0,r)+'" fill="'+col+'"/>';
+  if(sh==="star"){ var a=[]; for(var i=0;i<10;i++){ var t=-Math.PI/2+i*Math.PI/5, rr=i%2?r*0.45:r*1.12; a.push((cx+rr*Math.cos(t)).toFixed(1)+","+(cy+rr*Math.sin(t)).toFixed(1)); } return '<polygon points="'+a.join(" ")+'" fill="'+col+'"/>'; }
+  if(sh==="cross"){ var w=r*0.32; return '<path d="M'+(cx-w)+' '+(cy-r)+'h'+(2*w)+'v'+(r-w)+'h'+(r-w)+'v'+(2*w)+'h'+(w-r)+'v'+(r-w)+'h'+(-2*w)+'v'+(w-r)+'h'+(w-r)+'v'+(-2*w)+'h'+(r-w)+'z" fill="'+col+'"/>'; }
+  return "";
+}
+function itemKey(it){ return it.s+"|"+it.c; }
+function icon(it, size){ size = size||40; return it ? '<svg viewBox="0 0 40 40" width="'+size+'" height="'+size+'" aria-hidden="true">'+shapeSVG(it.s, COLORS[it.c], 20, 20, 14)+'</svg>' : ''; }
+function randItem(){ return {s:SHAPES[Math.floor(Math.random()*SHAPES.length)], c:Math.floor(Math.random()*COLORS.length)}; }
+function uniqueItems(n, avoid){ var seen={}, out=[], g=0; (avoid||[]).forEach(function(i){ seen[itemKey(i)]=1; }); while(out.length<n && g<5000){ g++; var it=randItem(); if(!seen[itemKey(it)]){ seen[itemKey(it)]=1; out.push(it); } } return out; }
+function similarItems(items){
+  var seen={}; items.forEach(function(i){ seen[itemKey(i)]=1; });
+  return items.map(function(it){
+    for(var g=0; g<60; g++){ var v = Math.random()<0.5 ? {s:it.s, c:Math.floor(Math.random()*COLORS.length)} : {s:SHAPES[Math.floor(Math.random()*SHAPES.length)], c:it.c}; if(!seen[itemKey(v)]){ seen[itemKey(v)]=1; return v; } }
+    var u = uniqueItems(1, Object.keys(seen).map(function(k){ var p=k.split("|"); return {s:p[0], c:+p[1]}; }))[0]; seen[itemKey(u)]=1; return u;
+  });
+}
+function adaptAcc(X, acc, max){ var old = X.level; if(acc>=0.9) X.level = Math.min(max, X.level+1); else if(acc<0.6) X.level = Math.max(1, X.level-1); return old; }
+function adaptErr(X, err, good, bad, max){ var old = X.level; if(err<=good){ X.good=(X.good||0)+1; if(X.good>=2 && X.level<max){ X.level++; X.good=0; } } else { X.good=0; if(err>bad && X.level>1) X.level--; } return old; }
+function lvlMsg(old, now){ return now>old ? "Subes al nivel "+now+"." : now<old ? "Bajas al nivel "+now+"." : "Sigues en el nivel "+now+"."; }
+function oneShot(ms, fn){ stopTimer(); timerId = setInterval(function(){ stopTimer(); fn(); }, ms); }
+function timerBar(secs, fn){
+  var dur = secs*1000, t = Date.now(), bar = document.getElementById("tbar");
+  stopTimer(); timerId = setInterval(function(){ var p = 1-(Date.now()-t)/dur; if(bar) bar.style.width = Math.max(0,p*100)+"%"; if(p<=0){ stopTimer(); fn(); } }, 80);
+}
+function startPanel(title, desc, extra){
+  return '<section class="view"><div class="panel"><h2>'+title+'</h2><p class="muted">'+desc+'</p>'+(extra||'')
+    + '<div class="row"><button class="btn primary" id="obStart">Empezar</button>'+obsBack()+'</div></div></section>';
+}
+
+/* Kim */
+function renderKim(){
+  var K = obs().kim, n = Math.min(4+K.level, 20), secs = Math.max(4, 12-K.level);
+  if(Ob.phase==="setup"){
+    view.innerHTML = startPanel("Juego de Kim", "Verás <b class=\"mono\">"+n+"</b> figuras durante <b class=\"mono\">"+secs+" s</b>. Después eliges cuáles estaban entre un grupo del doble. Nivel <span class=\"mono\">"+K.level+"</span>.",
+      '<p class="small muted">Truco: nómbralas en voz baja o agrúpalas por color. Desde el nivel 4 las figuras falsas se parecen a las reales.</p>');
+    wireBack();
+    document.getElementById("obStart").onclick = function(){ Ob = {mode:"kim", phase:"study", items:uniqueItems(n), t0:Date.now()}; renderKim(); };
+    return;
+  }
+  if(Ob.phase==="study"){
+    view.innerHTML = '<section class="view"><div class="panel"><div class="where small muted mono">Memoriza</div><div class="igrid">'+Ob.items.map(function(it){ return '<div class="icell">'+icon(it)+'</div>'; }).join("")+'</div>'
+      + '<div class="timer" style="max-width:none"><i id="tbar"></i></div><div class="row"><button class="btn primary" id="kDone">Listo</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    function toRecall(){ var d = K.level>=4 ? similarItems(Ob.items) : uniqueItems(Ob.items.length, Ob.items); Ob.cands = shuffle(Ob.items.map(function(i){ return {it:i, real:true}; }).concat(d.map(function(i){ return {it:i, real:false}; }))); Ob.sel = {}; Ob.phase = "recall"; renderKim(); }
+    timerBar(secs, toRecall);
+    document.getElementById("kDone").onclick = function(){ stopTimer(); toRecall(); };
+    return;
+  }
+  if(Ob.phase==="recall" || Ob.phase==="result"){
+    var res = Ob.phase==="result";
+    var h = '<section class="view"><div class="panel">';
+    if(res) h += '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+Ob.hits+'<span class="muted" style="font-size:1.2rem"> / '+Ob.items.length+'</span></div></div><p class="muted">'+(Ob.fa?Ob.fa+' falsa'+(Ob.fa>1?'s':'')+' alarma'+(Ob.fa>1?'s':'')+'. ':'')+lvlMsg(Ob.old, K.level)+'</p></div>'
+      + '<p class="small muted">Verde: acertaste. Punteado: estaba y no la marcaste. Rojo: la marcaste y no estaba.</p>';
+    else h += '<h2>¿Cuáles estaban?</h2><p class="small muted">Marca '+Ob.items.length+' figuras. Puedes marcar menos si no estás seguro: cada falsa alarma resta.</p>';
+    h += '<div class="igrid">';
+    Ob.cands.forEach(function(c,i){
+      var cls = "ibtn"; if(Ob.sel[i]) cls += " sel";
+      if(res){ cls = "ibtn"+(c.real && Ob.sel[i] ? " hit" : c.real ? " miss" : Ob.sel[i] ? " fa" : " dim"); }
+      h += '<button class="'+cls+'" data-k="'+i+'"'+(res?' disabled':'')+'>'+icon(c.it)+'</button>';
+    });
+    h += '</div><div class="row">'+(res ? '<button class="btn primary" id="kAgain">Otra</button>' : '<button class="btn primary" id="kGrade">Corregir</button><span class="small muted mono" id="kCount">'+Object.keys(Ob.sel).length+' marcadas</span>')+obsBack()+'</div></div></section>';
+    view.innerHTML = h; wireBack();
+    if(res){ document.getElementById("kAgain").onclick = function(){ Ob = {mode:"kim", phase:"setup"}; renderKim(); }; return; }
+    view.querySelectorAll("[data-k]").forEach(function(b){ b.onclick = function(){ var i=+b.getAttribute("data-k"); if(Ob.sel[i]) delete Ob.sel[i]; else Ob.sel[i]=1; b.classList.toggle("sel"); document.getElementById("kCount").textContent = Object.keys(Ob.sel).length+" marcadas"; }; });
+    document.getElementById("kGrade").onclick = function(){
+      var hits=0, fa=0; Ob.cands.forEach(function(c,i){ if(Ob.sel[i]){ if(c.real) hits++; else fa++; } });
+      var acc = Math.max(0, hits-fa)/Ob.items.length, old = adaptAcc(K, acc, 16);
+      K.hist.push({d:todayStr(), ts:Date.now(), n:Ob.items.length, hits:hits, fa:fa, acc:Math.round(acc*1000)/1000, lvl:old});
+      obsDone(); addMinutes(Date.now()-Ob.t0); save();
+      Ob.hits = hits; Ob.fa = fa; Ob.old = old; Ob.phase = "result"; renderKim();
+    };
+  }
+}
+
+/* Que cambio */
+function changeGrid(cells, opts){
+  opts = opts||{};
+  return '<div class="cgrid">'+cells.map(function(it,i){
+    var cls = "ccell"; if(opts.sel && opts.sel[i]) cls += " sel"; if(opts.mark) cls += " "+(opts.mark[i]||"");
+    return opts.click ? '<button class="'+cls+'" data-c="'+i+'"'+(opts.disabled?' disabled':'')+'>'+icon(it,36)+'</button>' : '<div class="'+cls+'">'+icon(it,36)+'</div>';
+  }).join("")+'</div>';
+}
+function renderChange(){
+  var C = obs().change, n = Math.min(14, 5+C.level), k = Math.min(3, 1+Math.floor((C.level-1)/3)), secs = Math.max(3, 8-Math.floor(C.level/2));
+  if(Ob.phase==="setup"){
+    view.innerHTML = startPanel("¿Qué cambió?", "Verás una cuadrícula con <b class=\"mono\">"+n+"</b> figuras durante <b class=\"mono\">"+secs+" s</b>. Luego vuelve con <b class=\"mono\">"+k+"</b> cambio"+(k>1?"s":"")+": color, forma, una figura que desapareció o una que apareció. Toca las casillas que cambiaron. Nivel <span class=\"mono\">"+C.level+"</span>.");
+    wireBack();
+    document.getElementById("obStart").onclick = function(){
+      var before = []; for(var i=0;i<16;i++) before.push(null);
+      shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0,n).forEach(function(i){ before[i] = randItem(); });
+      var after = before.map(function(x){ return x ? {s:x.s, c:x.c} : null; });
+      var changed = {};
+      shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0,k).forEach(function(i){
+        changed[i] = 1;
+        if(!before[i]){ after[i] = randItem(); return; }
+        var r = Math.random();
+        if(r<0.25) after[i] = null;
+        else if(r<0.62){ var c; do{ c = Math.floor(Math.random()*COLORS.length); } while(c===before[i].c); after[i] = {s:before[i].s, c:c}; }
+        else { var s; do{ s = SHAPES[Math.floor(Math.random()*SHAPES.length)]; } while(s===before[i].s); after[i] = {s:s, c:before[i].c}; }
+      });
+      Ob = {mode:"change", phase:"study", before:before, after:after, changed:changed, k:k, sel:{}, t0:Date.now()}; renderChange();
+    };
+    return;
+  }
+  if(Ob.phase==="study"){
+    view.innerHTML = '<section class="view"><div class="panel"><div class="where small muted mono">Observa</div>'+changeGrid(Ob.before)+'<div class="timer" style="max-width:none"><i id="tbar"></i></div><div class="row"><button class="btn primary" id="cDone">Listo</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    function blank(){ Ob.phase = "blank"; renderChange(); }
+    timerBar(secs, blank);
+    document.getElementById("cDone").onclick = function(){ stopTimer(); blank(); };
+    return;
+  }
+  if(Ob.phase==="blank"){
+    view.innerHTML = '<section class="view"><div class="panel"><div class="where small muted mono">…</div>'+changeGrid(Ob.before.map(function(){ return null; }))+'</div></section>';
+    oneShot(900, function(){ Ob.phase = "answer"; renderChange(); });
+    return;
+  }
+  var res = Ob.phase==="result", h = '<section class="view"><div class="panel">';
+  if(res){
+    var mark = {}; for(var i=0;i<16;i++){ if(Ob.changed[i] && Ob.sel[i]) mark[i]="hit"; else if(Ob.changed[i]) mark[i]="miss"; else if(Ob.sel[i]) mark[i]="fa"; }
+    h += '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+Ob.hits+'<span class="muted" style="font-size:1.2rem"> / '+Ob.k+'</span></div></div><p class="muted">'+(Ob.fa?Ob.fa+' falsa'+(Ob.fa>1?'s':'')+' alarma'+(Ob.fa>1?'s':'')+'. ':'')+lvlMsg(Ob.old, C.level)+'</p></div>'
+      + '<h3>Antes</h3>'+changeGrid(Ob.before,{mark:mark})+'<h3>Después</h3>'+changeGrid(Ob.after,{mark:mark})
+      + '<p class="small muted">Verde: cambio encontrado. Punteado: cambio que no viste. Rojo: marcaste algo que no cambió.</p>'
+      + '<div class="row"><button class="btn primary" id="cAgain">Otra</button>'+obsBack()+'</div>';
+  } else {
+    h += '<h2>Toca lo que cambió</h2><p class="small muted">Hay '+Ob.k+' cambio'+(Ob.k>1?'s':'')+'. Si algo desapareció, toca la casilla vacía.</p>'+changeGrid(Ob.after,{click:true, sel:Ob.sel})
+      + '<div class="row"><button class="btn primary" id="cGrade">Listo</button>'+obsBack()+'</div>';
+  }
+  h += '</div></section>';
+  view.innerHTML = h; wireBack();
+  if(res){ document.getElementById("cAgain").onclick = function(){ Ob = {mode:"change", phase:"setup"}; renderChange(); }; return; }
+  view.querySelectorAll("[data-c]").forEach(function(b){ b.onclick = function(){ var i=+b.getAttribute("data-c"); if(Ob.sel[i]) delete Ob.sel[i]; else Ob.sel[i]=1; b.classList.toggle("sel"); }; });
+  document.getElementById("cGrade").onclick = function(){
+    var hits=0, fa=0; for(var i in Ob.sel){ if(Ob.changed[i]) hits++; else fa++; }
+    var acc = Math.max(0, hits-fa)/Ob.k, old = adaptAcc(C, acc, 12);
+    C.hist.push({d:todayStr(), ts:Date.now(), k:Ob.k, hits:hits, fa:fa, acc:Math.round(acc*1000)/1000, lvl:old});
+    obsDone(); addMinutes(Date.now()-Ob.t0); save();
+    Ob.hits = hits; Ob.fa = fa; Ob.old = old; Ob.phase = "result"; renderChange();
+  };
+}
+
+/* Conteo flash */
+function dotsSVG(pts){ return '<svg viewBox="0 0 320 220" width="100%" style="max-width:480px;background:var(--soft);border-radius:10px" role="img" aria-label="Puntos">'+pts.map(function(p){ return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="4.5" fill="var(--ink)"/>'; }).join("")+'</svg>'; }
+function renderFlash(){
+  var F = obs().flash, r = FLASH[F.level], ms = FLASH_MS[F.level];
+  if(Ob.phase==="setup"){
+    view.innerHTML = startPanel("Conteo flash", "Aparecerán entre <b class=\"mono\">"+r[0]+"</b> y <b class=\"mono\">"+r[1]+"</b> puntos durante <b class=\"mono\">"+(ms/1000)+" s</b>. No hay tiempo de contarlos uno por uno: estima. Nivel <span class=\"mono\">"+F.level+"</span>.",
+      '<p class="small muted">Truco: divide mentalmente la imagen en cuartos, estima uno y multiplica.</p>');
+    wireBack();
+    document.getElementById("obStart").onclick = function(){
+      var n = r[0] + Math.floor(Math.random()*(r[1]-r[0]+1)), pts = [], g = 0, md = n>120 ? 9 : 12;
+      while(pts.length<n && g<20000){ g++; var x = 8+Math.random()*304, y = 8+Math.random()*204, ok = true; for(var i=0;i<pts.length;i++){ var dx=pts[i][0]-x, dy=pts[i][1]-y; if(dx*dx+dy*dy<md*md){ ok=false; break; } } if(ok) pts.push([x,y]); }
+      Ob = {mode:"flash", phase:"ready", pts:pts, t0:Date.now()}; renderFlash();
+    };
+    return;
+  }
+  if(Ob.phase==="ready"){
+    view.innerHTML = '<section class="view"><div class="panel"><div class="stage"><div class="where">Prepárate</div><div class="word mono">…</div></div></div></section>';
+    oneShot(700, function(){ Ob.phase = "show"; renderFlash(); });
+    return;
+  }
+  if(Ob.phase==="show"){
+    view.innerHTML = '<section class="view"><div class="panel" style="align-items:center">'+dotsSVG(Ob.pts)+'</div></section>';
+    oneShot(ms, function(){ Ob.phase = "ask"; renderFlash(); });
+    return;
+  }
+  if(Ob.phase==="ask"){
+    view.innerHTML = '<section class="view"><div class="panel"><h2>¿Cuántos puntos había?</h2><input id="flIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.2rem"><div class="row"><button class="btn primary" id="flGo">Responder</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    var inp = document.getElementById("flIn"); inp.focus();
+    function go2(){
+      var est = parseNum(inp.value); if(!(est>0)) return;
+      var real = Ob.pts.length, err = relErr(est, real), old = adaptErr(F, err, 10, 30, 4);
+      F.hist.push({d:todayStr(), ts:Date.now(), est:est, real:real, err:Math.round(err*10)/10, lvl:old});
+      obsDone(); addMinutes(Date.now()-Ob.t0); save();
+      Ob.est = est; Ob.err = err; Ob.old = old; Ob.phase = "result"; renderFlash();
+    }
+    document.getElementById("flGo").onclick = go2;
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+    return;
+  }
+  var last = F.hist.slice(-10).map(function(x){ return x.err; });
+  view.innerHTML = '<section class="view"><div class="panel">'
+    + '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+fmtNum(Ob.est)+'<span class="muted" style="font-size:1.2rem"> / '+Ob.pts.length+'</span></div></div><p class="muted">'+lvlMsg(Ob.old, F.level)+'</p></div>'
+    + '<p>Error de <b class="mono">'+Math.round(Ob.err)+'%</b>. '+(Ob.err<=10?'Excelente.':Ob.err<=25?'Bien.':'A seguir practicando.')+'</p>'
+    + '<div style="display:flex;justify-content:center">'+dotsSVG(Ob.pts)+'</div>'
+    + '<p class="small muted">Error medio de tus últimas '+last.length+': <span class="mono">'+Math.round(avg(last))+'%</span>. La mayoría de la gente subestima cuando hay muchos puntos.</p>'
+    + '<div class="row"><button class="btn primary" id="flAgain">Otra</button>'+obsBack()+'</div></div></section>';
+  wireBack();
+  document.getElementById("flAgain").onclick = function(){ Ob = {mode:"flash", phase:"setup"}; renderFlash(); };
+}
+
+/* Ojo metrico */
+function eyeTask(level){
+  var t = ["len","ang","bar"][Math.floor(Math.random()*3)], g = "", ans, unit, q;
+  var rnd = function(a,b){ return a + Math.random()*(b-a); };
+  if(t==="len"){
+    var R = 70, a = level>=2 ? rnd(0, Math.PI) : 0, maxL = Math.min(260, 2*145/Math.max(0.01,Math.abs(Math.cos(a))), 2*60/Math.max(0.01,Math.abs(Math.sin(a))));
+    var L = rnd(25, maxL), cx = 160, cy = 130, dx = Math.cos(a)*L/2, dy = Math.sin(a)*L/2;
+    var ra = level>=3 ? rnd(-0.6, 0.6) : 0, rx = 20, ry = 30;
+    g += '<line x1="'+rx+'" y1="'+ry+'" x2="'+(rx+Math.cos(ra)*R).toFixed(1)+'" y2="'+(ry+Math.sin(ra)*R).toFixed(1)+'" stroke="var(--brass)" stroke-width="4" stroke-linecap="round"/>'
+      + '<text x="'+(rx+Math.cos(ra)*R+8).toFixed(1)+'" y="'+(ry+Math.sin(ra)*R+4).toFixed(1)+'" style="font-size:12px">= 100</text>'
+      + '<line x1="'+(cx-dx).toFixed(1)+'" y1="'+(cy-dy).toFixed(1)+'" x2="'+(cx+dx).toFixed(1)+'" y2="'+(cy+dy).toFixed(1)+'" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>';
+    ans = Math.round(L/R*100); unit = ""; q = "La línea dorada mide 100. ¿Cuánto mide la azul?";
+  } else if(t==="ang"){
+    var A = level===1 ? 5*Math.round(rnd(2,34)) : Math.round(rnd(8,172)), b = level===1 ? 0 : rnd(0, 360), vx = 160, vy = 110, len = 90;
+    var b1 = b*Math.PI/180, b2 = (b-A)*Math.PI/180;
+    g += '<line x1="'+vx+'" y1="'+vy+'" x2="'+(vx+Math.cos(b1)*len).toFixed(1)+'" y2="'+(vy-Math.sin(b1)*len).toFixed(1)+'" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>'
+      + '<line x1="'+vx+'" y1="'+vy+'" x2="'+(vx+Math.cos(b1+A*Math.PI/180)*len).toFixed(1)+'" y2="'+(vy-Math.sin(b1+A*Math.PI/180)*len).toFixed(1)+'" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>'
+      + '<circle cx="'+vx+'" cy="'+vy+'" r="4" fill="var(--brass)"/>';
+    ans = A; unit = "°"; q = "¿Cuántos grados mide el ángulo?";
+  } else {
+    var p = level===1 ? 5*Math.round(rnd(1,19)) : Math.round(rnd(3,97)), vert = level>=3 && Math.random()<0.5;
+    if(vert) g += '<rect x="140" y="20" width="40" height="180" fill="none" stroke="var(--muted)" stroke-width="2"/><rect x="140" y="'+(20+180*(1-p/100)).toFixed(1)+'" width="40" height="'+(180*p/100).toFixed(1)+'" fill="var(--accent)"/>';
+    else g += '<rect x="30" y="90" width="260" height="40" fill="none" stroke="var(--muted)" stroke-width="2"/><rect x="30" y="90" width="'+(260*p/100).toFixed(1)+'" height="40" fill="var(--accent)"/>';
+    ans = p; unit = "%"; q = "¿Qué porcentaje de la barra está lleno?";
+  }
+  return {t:t, svg:'<svg viewBox="0 0 320 220" width="100%" style="max-width:480px" role="img" aria-label="Figura para estimar">'+g+'</svg>', ans:ans, unit:unit, q:q};
+}
+function renderEye(){
+  var E = obs().eye;
+  if(Ob.phase==="setup"){ Ob.task = eyeTask(E.level); Ob.phase = "ask"; Ob.t0 = Date.now(); }
+  var T = Ob.task;
+  if(Ob.phase==="ask"){
+    view.innerHTML = '<section class="view"><div class="panel"><h3>Ojo métrico · nivel '+E.level+'</h3><h2>'+esc(T.q)+'</h2><div style="display:flex;justify-content:center">'+T.svg+'</div>'
+      + '<input id="eIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.2rem" placeholder="'+(T.unit||"número")+'"><div class="row"><button class="btn primary" id="eGo">Responder</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    var inp = document.getElementById("eIn"); inp.focus();
+    function go2(){
+      var est = parseNum(inp.value); if(!(est>=0) || inp.value.trim()==="") return;
+      var err = T.t==="len" ? relErr(est, T.ans) : Math.abs(est-T.ans), old = adaptErr(E, err, 8, 20, 3);
+      E.hist.push({d:todayStr(), ts:Date.now(), t:T.t, est:est, real:T.ans, err:Math.round(err*10)/10, lvl:old});
+      obsDone(); addMinutes(Date.now()-Ob.t0); save();
+      Ob.est = est; Ob.err = err; Ob.old = old; Ob.phase = "result"; renderEye();
+    }
+    document.getElementById("eGo").onclick = go2;
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+    return;
+  }
+  var unitTxt = T.t==="len" ? "%" : T.t==="ang" ? " grados" : " puntos";
+  view.innerHTML = '<section class="view"><div class="panel">'
+    + '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+fmtNum(Ob.est)+'<span class="muted" style="font-size:1.2rem"> / '+T.ans+T.unit+'</span></div></div><p class="muted">'+lvlMsg(Ob.old, E.level)+'</p></div>'
+    + '<p>Error de <b class="mono">'+Math.round(Ob.err)+unitTxt+'</b>. '+(Ob.err<=8?'Excelente.':Ob.err<=20?'Bien.':'A seguir practicando.')+'</p>'
+    + '<div style="display:flex;justify-content:center">'+T.svg+'</div>'
+    + '<p class="small muted">'+(T.t==="ang" ? "Referencias: una esquina es 90°, la mitad 45°, un tercio de esquina 30°." : T.t==="len" ? "Compara contra la referencia: ¿cabe dos veces, tres, la mitad?" : "Busca primero la mitad, luego los cuartos.")+'</p>'
+    + '<div class="row"><button class="btn primary" id="eAgain">Otra</button>'+obsBack()+'</div></div></section>';
+  wireBack();
+  document.getElementById("eAgain").onclick = function(){ Ob = {mode:"eye", phase:"setup"}; renderEye(); };
+}
+
+/* Calibracion */
+function rangeBank(){ return DATES.map(function(d,i){ return {id:"d"+i, q:d[0], v:d[1], u:d[2]}; }).concat(FERMI.map(function(f,i){ return {id:"f"+i, q:f[0], v:f[1], u:f[2], note:f[3]}; })); }
+function leastSeen(ids, hist){ var seen={}; hist.forEach(function(h){ seen[h.q]=(seen[h.q]||0)+1; }); var min=Infinity; ids.forEach(function(i){ min=Math.min(min, seen[i]||0); }); var pool=ids.filter(function(i){ return (seen[i]||0)===min; }); return pool[Math.floor(Math.random()*pool.length)]; }
+function calibStats(){
+  var H = obs().calib.hist, r = H.filter(function(h){ return h.t==="range"; }).slice(-20), t = H.filter(function(h){ return h.t==="tf"; }).slice(-30);
+  return {rangeN:r.length, rangeHit:r.length ? r.filter(function(h){ return h.hit; }).length/r.length*100 : null, tfN:t.length, brier:t.length ? avg(t.map(function(h){ return h.brier; })) : null};
+}
+function renderCalib(){
+  var Cb = obs().calib, cs = calibStats();
+  if(Ob.phase==="setup"){
+    view.innerHTML = '<section class="view"><div class="panel"><h2>Calibración</h2><p class="muted">Mide si tu seguridad coincide con tu acierto. Ser calibrado significa que cuando dices 80%, aciertas 8 de cada 10.</p>'
+      + '<div class="daybar"><div class="stat"><h3>Rangos 90%</h3><b class="mono">'+(cs.rangeHit==null?"·":Math.round(cs.rangeHit)+"%")+'</b><span class="muted small">de '+cs.rangeN+'; la meta es 90%</span></div>'
+      + '<div class="stat"><h3>Brier</h3><b class="mono">'+(cs.brier==null?"·":cs.brier.toFixed(3))+'</b><span class="muted small">0 es perfecto; siempre 50% da 0,25</span></div><div></div></div>'
+      + '<div class="blocks"><div class="block"><div class="check"></div><div><div style="font-weight:600">Rangos del 90%</div><div class="muted small">Da un mínimo y un máximo donde estés 90% seguro de que cae la respuesta.</div></div><button class="btn small" id="cbR">Ir</button></div>'
+      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Verdadero o falso con seguridad</div><div class="muted small">Responde y di qué tan seguro estás, de 50% a 100%.</div></div><button class="btn small" id="cbT">Ir</button></div></div>'
+      + '<div class="row">'+obsBack()+'</div></div></section>';
+    wireBack();
+    document.getElementById("cbR").onclick = function(){ var B = rangeBank(), id = leastSeen(B.map(function(b){ return b.id; }), Cb.hist.filter(function(h){ return h.t==="range"; })); Ob = {mode:"calib", phase:"range", item:B.filter(function(b){ return b.id===id; })[0], t0:Date.now()}; renderCalib(); };
+    document.getElementById("cbT").onclick = function(){ var i = leastSeen(TF.map(function(_,k){ return k; }), Cb.hist.filter(function(h){ return h.t==="tf"; })); Ob = {mode:"calib", phase:"tf", i:i, ans:null, conf:null, t0:Date.now()}; renderCalib(); };
+    return;
+  }
+  if(Ob.phase==="range"){
+    var it = Ob.item;
+    view.innerHTML = '<section class="view"><div class="panel"><h3>Rango del 90%</h3><h2>'+esc(it.q)+'</h2><p class="small muted">En <b>'+esc(it.u)+'</b>. Un rango demasiado estrecho es el error más común: si no sabes, ábrelo.</p>'
+      + '<div class="row"><label class="small muted" style="flex:1 1 120px">Mínimo<input id="rLo" inputmode="decimal" autocomplete="off" class="mono"></label><label class="small muted" style="flex:1 1 120px">Máximo<input id="rHi" inputmode="decimal" autocomplete="off" class="mono"></label></div>'
+      + '<p class="small" id="rMsg" style="min-height:1.2em;color:var(--muted)"></p><div class="row"><button class="btn primary" id="rGo">Responder</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    var lo = document.getElementById("rLo"), hi = document.getElementById("rHi"), msg = document.getElementById("rMsg"); lo.focus();
+    function fy(n){ return it.u==="año" ? String(n) : fmtNum(n); }
+    function prev(){ var a = parseNum(lo.value), b = parseNum(hi.value); msg.textContent = (lo.value||hi.value) ? "Entre "+(isFinite(a)?fy(a):"?")+" y "+(isFinite(b)?fy(b):"?") : ""; }
+    lo.oninput = prev; hi.oninput = prev;
+    function go2(){
+      var a = parseNum(lo.value), b = parseNum(hi.value);
+      if(!isFinite(a) || !isFinite(b)){ msg.textContent = "Escribe los dos números."; return; }
+      if(a>b){ var t=a; a=b; b=t; }
+      var hit = a<=it.v && it.v<=b;
+      Cb.hist.push({t:"range", d:todayStr(), ts:Date.now(), q:it.id, lo:a, hi:b, real:it.v, hit:hit});
+      obsDone(); addMinutes(Date.now()-Ob.t0); save();
+      Ob.lo = a; Ob.hi = b; Ob.hit = hit; Ob.phase = "rangeRes"; renderCalib();
+    }
+    document.getElementById("rGo").onclick = go2;
+    hi.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+    return;
+  }
+  if(Ob.phase==="rangeRes"){
+    var it2 = Ob.item, fy2 = function(n){ return it2.u==="año" ? String(n) : fmtNum(n); }, adv = cs.rangeN<5 ? "Necesitas unas 10 respuestas para ver tu tendencia." : cs.rangeHit<80 ? "Tus rangos son demasiado estrechos: sobreconfianza. Ábrelos más." : cs.rangeHit>97 ? "Aciertas casi siempre: quizá tus rangos son demasiado amplios." : "Vas bien calibrado.";
+    view.innerHTML = '<section class="view"><div class="panel"><h3>'+(Ob.hit?"Dentro del rango":"Fuera del rango")+'</h3><h2>'+esc(it2.q)+'</h2>'
+      + '<div class="res"><span class="muted">Tu rango</span><span class="mono">'+fy2(Ob.lo)+' a '+fy2(Ob.hi)+'</span><span class="'+(Ob.hit?'ok':'bad')+'">'+(Ob.hit?'✓':'✗')+'</span></div>'
+      + '<div class="res"><span class="muted">Valor real</span><span class="mono">'+fy2(it2.v)+(it2.u==="año"?'':' '+esc(it2.u))+'</span><span></span></div>'
+      + (it2.note ? '<p class="small muted">'+esc(it2.note)+'</p>' : '')
+      + '<p class="small muted">Últimas '+cs.rangeN+': <span class="mono">'+Math.round(cs.rangeHit)+'%</span> dentro del rango. '+adv+'</p>'
+      + '<div class="row"><button class="btn primary" id="rNext">Siguiente</button><button class="btn small ghost" id="rMenu">Calibración</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    document.getElementById("rNext").onclick = function(){ Ob = {mode:"calib", phase:"setup"}; renderCalib(); document.getElementById("cbR").click(); };
+    document.getElementById("rMenu").onclick = function(){ Ob = {mode:"calib", phase:"setup"}; renderCalib(); };
+    return;
+  }
+  if(Ob.phase==="tf"){
+    var s = TF[Ob.i];
+    view.innerHTML = '<section class="view"><div class="panel"><h3>Verdadero o falso</h3><h2>'+esc(s[0])+'</h2>'
+      + '<div class="row"><button class="btn'+(Ob.ans===true?' primary':'')+'" data-a="1">Verdadero</button><button class="btn'+(Ob.ans===false?' primary':'')+'" data-a="0">Falso</button></div>'
+      + '<h3>¿Qué tan seguro estás?</h3><div class="row">'+[50,60,70,80,90,100].map(function(c){ return '<button class="btn small'+(Ob.conf===c?' primary':'')+'" data-p="'+c+'">'+c+'%</button>'; }).join("")+'</div>'
+      + '<p class="small muted">50% es adivinar al azar. 100% solo si apostarías cualquier cosa.</p>'
+      + '<div class="row"><button class="btn primary" id="tGo"'+(Ob.ans===null||Ob.conf===null?' disabled':'')+'>Responder</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    view.querySelectorAll("[data-a]").forEach(function(b){ b.onclick = function(){ Ob.ans = b.getAttribute("data-a")==="1"; renderCalib(); }; });
+    view.querySelectorAll("[data-p]").forEach(function(b){ b.onclick = function(){ Ob.conf = +b.getAttribute("data-p"); renderCalib(); }; });
+    document.getElementById("tGo").onclick = function(){
+      var ok = Ob.ans===s[1], p = Ob.conf/100, brier = Math.pow(p-(ok?1:0), 2);
+      Cb.hist.push({t:"tf", d:todayStr(), ts:Date.now(), q:Ob.i, ans:Ob.ans, conf:Ob.conf, ok:ok, brier:Math.round(brier*10000)/10000});
+      obsDone(); addMinutes(Date.now()-Ob.t0); save();
+      Ob.ok = ok; Ob.brier = brier; Ob.phase = "tfRes"; renderCalib();
+    };
+    return;
+  }
+  var s2 = TF[Ob.i];
+  view.innerHTML = '<section class="view"><div class="panel"><h3>'+(Ob.ok?"Correcto":"Incorrecto")+' con '+Ob.conf+'% de seguridad</h3><h2>'+esc(s2[0])+'</h2>'
+    + '<p>Es <b>'+(s2[1]?"verdadero":"falso")+'</b>. '+esc(s2[2])+'</p>'
+    + '<p class="small muted">Puntaje Brier de esta respuesta: <span class="mono">'+Ob.brier.toFixed(3)+'</span>. Promedio de tus últimas '+cs.tfN+': <span class="mono">'+cs.brier.toFixed(3)+'</span>.'+(!Ob.ok && Ob.conf>=90 ? ' Fallar con mucha seguridad es lo que más castiga el puntaje.' : '')+'</p>'
+    + '<div class="row"><button class="btn primary" id="tNext">Siguiente</button><button class="btn small ghost" id="tMenu">Calibración</button>'+obsBack()+'</div></div></section>';
+  wireBack();
+  document.getElementById("tNext").onclick = function(){ Ob = {mode:"calib", phase:"setup"}; renderCalib(); document.getElementById("cbT").click(); };
+  document.getElementById("tMenu").onclick = function(){ Ob = {mode:"calib", phase:"setup"}; renderCalib(); };
+}
+
+/* Dia de la semana */
+function doomsday(y, m, d){
+  var c = Math.floor(y/100), an = {18:5, 19:3, 20:2, 21:0}[c];
+  var yy = y%100, a = Math.floor(yy/12), b = yy%12, q = Math.floor(b/4), dd = (an+a+b+q)%7;
+  var leap = (y%4===0 && y%100!==0) || y%400===0;
+  var ref = [leap?4:3, leap?29:28, 14, 4, 9, 6, 11, 8, 5, 10, 7, 12][m-1];
+  return {c:c, an:an, yy:yy, a:a, b:b, q:q, dd:dd, leap:leap, ref:ref, wd:((dd + d - ref)%7 + 7)%7};
+}
+function renderDow(){
+  var D = obs().dow;
+  if(Ob.phase==="setup"){
+    var rg = DOW_RANGE[D.level], yNow = new Date().getFullYear(), rng = rg ? rg[0]+" a "+rg[1] : "este año";
+    view.innerHTML = '<section class="view"><div class="panel"><h2>Día de la semana</h2><p class="muted">Te doy una fecha y dices qué día de la semana cae, de cabeza. Nivel <span class="mono">'+D.level+'</span>: fechas de '+rng+'.</p>'
+      + '<details class="lesson"><summary>Cómo se calcula: el algoritmo Doomsday</summary><div class="prose small">'
+      + '<p>John Conway descubrió que ciertas fechas fáciles de recordar caen siempre el mismo día de la semana dentro de un año. A ese día lo llamó <b>doomsday</b>.</p>'
+      + '<p><b>1. Fechas ancla del año.</b> 4/4, 6/6, 8/8, 10/10 y 12/12. Luego 9/5 y 5/9, 7/11 y 11/7 (truco en inglés: "9 to 5 at 7-11"). En marzo, el 14 (día de pi). En enero, el 3 (el 4 si es bisiesto). En febrero, el último día.</p>'
+      + '<p><b>2. Ancla del siglo.</b> 1800 viernes, 1900 miércoles, 2000 martes, 2100 domingo.</p>'
+      + '<p><b>3. Doomsday del año.</b> Toma los dos últimos dígitos del año. Divídelos entre 12 (cociente a, resto b), divide b entre 4 (cociente c). Suma ancla + a + b + c y quita múltiplos de 7.</p>'
+      + '<p><b>4. Cuenta.</b> Ve de la fecha ancla del mes a tu fecha sumando o restando días, en múltiplos de 7 para ir rápido.</p>'
+      + '<p>Ejemplo: 15 de noviembre de 1987. Siglo 1900: miércoles (3). 87 ÷ 12 = 7 resto 3; 3 ÷ 4 = 0. 3 + 7 + 3 + 0 = 13, menos 7 = 6: sábado. En noviembre el ancla es el 7, que fue sábado; el 14 también, así que el 15 fue domingo.</p>'
+      + '<p>Para empezar sirve con memorizar el doomsday de este año: en '+yNow+' es '+DAYS[doomsday(yNow,4,4).dd]+'.</p>'
+      + '</div></details>'
+      + '<div class="row"><button class="btn primary" id="obStart">Empezar</button>'+obsBack()+'</div></div></section>';
+    wireBack();
+    document.getElementById("obStart").onclick = function(){
+      var y = rg ? rg[0]+Math.floor(Math.random()*(rg[1]-rg[0]+1)) : yNow, m = 1+Math.floor(Math.random()*12), dim = new Date(y, m, 0).getDate(), d = 1+Math.floor(Math.random()*dim);
+      Ob = {mode:"dow", phase:"ask", y:y, m:m, d:d, t0:performance.now(), w0:Date.now()}; renderDow();
+    };
+    return;
+  }
+  if(Ob.phase==="ask"){
+    view.innerHTML = '<section class="view"><div class="panel"><div class="stage"><div class="where">¿Qué día de la semana cae?</div><div class="word" style="font-size:clamp(1.6rem,7vw,2.4rem)">'+Ob.d+' de '+MONTHS[Ob.m-1]+' de '+Ob.y+'</div></div>'
+      + '<div class="dows">'+[1,2,3,4,5,6,0].map(function(i){ return '<button class="btn" data-w="'+i+'">'+DAYS[i]+'</button>'; }).join("")+'</div>'
+      + '<div class="row">'+obsBack()+'</div></div></section>';
+    wireBack();
+    view.querySelectorAll("[data-w]").forEach(function(b){ b.onclick = function(){
+      var got = +b.getAttribute("data-w"), real = new Date(Ob.y, Ob.m-1, Ob.d).getDay(), secs = (performance.now()-Ob.t0)/1000, ok = got===real, old = D.level;
+      if(ok && secs<=40){ D.good=(D.good||0)+1; D.bad=0; if(D.good>=3 && D.level<4){ D.level++; D.good=0; } }
+      else if(!ok){ D.good=0; D.bad=(D.bad||0)+1; if(D.bad>=2 && D.level>1){ D.level--; D.bad=0; } }
+      D.hist.push({d:todayStr(), ts:Date.now(), date:Ob.y+"-"+pad2(Ob.m)+"-"+pad2(Ob.d), got:got, real:real, ok:ok, secs:Math.round(secs*10)/10, lvl:old});
+      obsDone(); addMinutes(Date.now()-Ob.w0); save();
+      Ob.got = got; Ob.real = real; Ob.ok = ok; Ob.secs = secs; Ob.old = old; Ob.phase = "result"; renderDow();
+    }; });
+    return;
+  }
+  var s = doomsday(Ob.y, Ob.m, Ob.d), diff = Ob.d - s.ref;
+  var steps = s.c>=18 && s.c<=21 ? '<ol class="small"><li>Ancla del siglo '+s.c+'00: '+DAYS[s.an]+' ('+s.an+').</li>'
+    + '<li>'+s.yy+' ÷ 12 = '+s.a+', resto '+s.b+'. '+s.b+' ÷ 4 = '+s.q+'.</li>'
+    + '<li>'+s.an+' + '+s.a+' + '+s.b+' + '+s.q+' = '+(s.an+s.a+s.b+s.q)+' → '+s.dd+' ('+DAYS[s.dd]+'). Ese es el doomsday de '+Ob.y+(s.leap?', año bisiesto':'')+'.</li>'
+    + '<li>En '+MONTHS[Ob.m-1]+' la fecha ancla es el '+s.ref+', que cae '+DAYS[s.dd]+'.</li>'
+    + '<li>Del '+s.ref+' al '+Ob.d+' hay '+(diff>=0?diff:"menos "+(-diff))+' días → '+DAYS[s.wd]+'.</li></ol>' : '';
+  var last = D.hist.filter(function(h){ return h.ok; }).slice(-10).map(function(h){ return h.secs; });
+  view.innerHTML = '<section class="view"><div class="panel"><h3>'+(Ob.ok?"Correcto":"Incorrecto")+' en '+Ob.secs.toFixed(1)+' s</h3><h2>El '+Ob.d+' de '+MONTHS[Ob.m-1]+' de '+Ob.y+' cae en '+DAYS[Ob.real]+'</h2>'
+    + (Ob.ok ? '' : '<p class="muted">Respondiste '+DAYS[Ob.got]+'.</p>')
+    + steps
+    + '<p class="small muted">'+lvlMsg(Ob.old, D.level)+(last.length ? ' Tiempo medio de tus últimos aciertos: <span class="mono">'+avg(last).toFixed(1)+' s</span>.' : '')+' Subes con 3 aciertos seguidos en menos de 40 s.</p>'
+    + '<div class="row"><button class="btn primary" id="dAgain">Otra</button>'+obsBack()+'</div></div></section>';
+  wireBack();
+  document.getElementById("dAgain").onclick = function(){ Ob = {mode:"dow", phase:"setup"}; renderDow(); document.getElementById("obStart").click(); };
+}
+
+/* Progreso del Observador */
+function seriesChart(vals, color, label, unit){
+  if(vals.length<2) return '<p class="small muted">'+label+': aparece cuando tengas al menos 2 intentos.</p>';
+  var data = vals.slice(-40), Wd=400, H=150, ml=36, mr=10, mt=10, mb=20, max = 0;
+  data.forEach(function(v){ max = Math.max(max, v); }); max = max<=0 ? 1 : max*1.1;
+  function x(i){ return ml + i*(Wd-ml-mr)/(data.length-1); }
+  function y(v){ return mt + (H-mt-mb)*(1-v/max); }
+  var g = "";
+  [0, max/2, max].forEach(function(v){ g += '<line x1="'+ml+'" x2="'+(Wd-mr)+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" stroke="var(--line)"/><text x="'+(ml-6)+'" y="'+(y(v)+3).toFixed(1)+'" text-anchor="end">'+(v<10&&v>0?v.toFixed(1):Math.round(v))+'</text>'; });
+  data.forEach(function(v,i){ g += '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="2.6" fill="'+color+'" fill-opacity=".35"/>'; });
+  var ma = data.map(function(_,i){ var s = data.slice(Math.max(0,i-6), i+1); return avg(s); });
+  g += '<path d="'+ma.map(function(v,i){ return (i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1); }).join(" ")+'" fill="none" stroke="'+color+'" stroke-width="2.2" stroke-linejoin="round"/>';
+  g += '<text x="'+ml+'" y="'+(H-5)+'">intento 1</text><text x="'+(Wd-mr)+'" y="'+(H-5)+'" text-anchor="end">intento '+data.length+'</text>';
+  return '<div class="chartbox"><svg viewBox="0 0 '+Wd+' '+H+'" width="100%" role="img" aria-label="'+esc(label)+'">'+g+'</svg></div>';
+}
+function calibCurve(){
+  var t = obs().calib.hist.filter(function(h){ return h.t==="tf"; });
+  if(t.length<10) return '<p class="small muted">La curva aparece con al menos 10 respuestas de verdadero o falso. Llevas '+t.length+'.</p>';
+  var B = [50,60,70,80,90,100], Wd=400, H=220, ml=40, mr=14, mt=10, mb=26;
+  function x(c){ return ml + (c-50)/50*(Wd-ml-mr); }
+  function y(v){ return mt + (H-mt-mb)*(1-v/100); }
+  var g = "";
+  [0,25,50,75,100].forEach(function(v){ g += '<line x1="'+ml+'" x2="'+(Wd-mr)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="'+(ml-6)+'" y="'+(y(v)+3)+'" text-anchor="end">'+v+'%</text>'; });
+  g += '<line x1="'+x(50)+'" y1="'+y(50)+'" x2="'+x(100)+'" y2="'+y(100)+'" stroke="var(--muted)" stroke-dasharray="4 4"/>';
+  var pts = [];
+  B.forEach(function(c){ var s = t.filter(function(h){ return h.conf===c; }); g += '<text x="'+x(c)+'" y="'+(H-8)+'" text-anchor="middle">'+c+'%</text>'; if(!s.length) return; var p = s.filter(function(h){ return h.ok; }).length/s.length*100; pts.push([c,p,s.length]); });
+  if(pts.length>1) g += '<path d="'+pts.map(function(p,i){ return (i?"L":"M")+x(p[0]).toFixed(1)+" "+y(p[1]).toFixed(1); }).join(" ")+'" fill="none" stroke="var(--accent)" stroke-width="2"/>';
+  pts.forEach(function(p){ g += '<circle cx="'+x(p[0]).toFixed(1)+'" cy="'+y(p[1]).toFixed(1)+'" r="'+Math.min(9, 3+Math.sqrt(p[2]))+'" fill="var(--accent)"/><text x="'+(x(p[0])+10).toFixed(1)+'" y="'+(y(p[1])-8).toFixed(1)+'">'+p[2]+'</text>'; });
+  return '<div class="chartbox"><svg viewBox="0 0 '+Wd+' '+H+'" width="100%" role="img" aria-label="Curva de calibración">'+g+'</svg></div>'
+    + '<p class="small muted">Eje horizontal: la seguridad que dijiste. Eje vertical: cuántas acertaste realmente. La línea punteada es la calibración perfecta; por debajo eres sobreconfiado, por encima, inseguro. El número junto a cada punto es cuántas respuestas hay.</p>';
+}
+function obsProgressHTML(){
+  var O = obs(), cs = calibStats();
+  var any = O.clock.hist.length+O.fermi.hist.length+O.kim.hist.length+O.change.hist.length+O.flash.hist.length+O.eye.hist.length+O.calib.hist.length+O.dow.hist.length;
+  if(!any) return '<div class="panel"><h3>Observador</h3><p class="small muted">Tus gráficas de observación y estimación aparecen aquí cuando hagas los primeros ejercicios.</p></div>';
+  var bestClock = O.clock.hist.length ? Math.min.apply(null, O.clock.hist.map(function(h){ return h.err; })) : null;
+  var dowOk = O.dow.hist.filter(function(h){ return h.ok; }), bestDow = dowOk.length ? Math.min.apply(null, dowOk.map(function(h){ return h.secs; })) : null;
+  var maxKim = O.kim.hist.reduce(function(m,h){ return Math.max(m, h.lvl||1); }, O.kim.level);
+  var h = '<div class="panel"><h3>Observador: récords</h3><div class="daybar">'
+    + '<div class="stat"><h3>Reloj</h3><b class="mono">'+(bestClock==null?"·":bestClock.toFixed(1)+"%")+'</b><span class="muted small">menor error</span></div>'
+    + '<div class="stat"><h3>Kim</h3><b class="mono">'+maxKim+'</b><span class="muted small">nivel máximo</span></div>'
+    + '<div class="stat"><h3>Doomsday</h3><b class="mono">'+(bestDow==null?"·":bestDow.toFixed(1)+" s")+'</b><span class="muted small">acierto más rápido</span></div>'
+    + '</div></div>';
+  var sec = function(title, legend, html){ h += '<div class="panel"><h3>'+title+'</h3><p class="small muted">'+legend+'</p>'+html+'</div>'; };
+  sec("Reloj interno", "Error en %. Más bajo es mejor. La línea es la media de los últimos 7.", seriesChart(O.clock.hist.map(function(x){ return x.err; }), "var(--accent)", "Reloj interno"));
+  sec("Conteo flash", "Error en %. Más bajo es mejor.", seriesChart(O.flash.hist.map(function(x){ return x.err; }), "var(--brass)", "Conteo flash"));
+  sec("Ojo métrico", "Error en % para longitudes, en grados para ángulos y en puntos para barras. Más bajo es mejor.", seriesChart(O.eye.hist.map(function(x){ return x.err; }), "var(--accent)", "Ojo métrico"));
+  sec("Fermi", "Error logarítmico: 0,3 es fallar por el doble, 1 es fallar por 10 veces. Más bajo es mejor.", seriesChart(O.fermi.hist.map(function(x){ return x.err; }), "var(--brass)", "Fermi"));
+  sec("Juego de Kim", "Precisión neta en %: aciertos menos falsas alarmas. Más alto es mejor.", seriesChart(O.kim.hist.map(function(x){ return x.acc*100; }), "var(--ok)", "Juego de Kim"));
+  sec("¿Qué cambió?", "Precisión neta en %. Más alto es mejor.", seriesChart(O.change.hist.map(function(x){ return x.acc*100; }), "var(--ok)", "Qué cambió"));
+  sec("Día de la semana", "Segundos por acierto. Más bajo es mejor.", seriesChart(dowOk.map(function(x){ return x.secs; }), "var(--accent)", "Día de la semana"));
+  sec("Calibración", "Rangos del 90%: <span class=\"mono\">"+(cs.rangeHit==null?"·":Math.round(cs.rangeHit)+"%")+"</span> dentro en las últimas "+cs.rangeN+". Brier: <span class=\"mono\">"+(cs.brier==null?"·":cs.brier.toFixed(3))+"</span> en las últimas "+cs.tfN+".", calibCurve());
+  return h;
+}
+
 /* ---------- PROGRESO ---------- */
 function chart(hist, color, label){
   var data = hist.slice(-30);
@@ -809,7 +1720,7 @@ function chart(hist, color, label){
 }
 var impMsg = "";
 function renderProgreso(){
-  var totalMin = 0, days = 0; for(var d in S.log){ totalMin += S.log[d].min; if(S.log[d].w+S.log[d].n+S.log[d].m>0) days++; }
+  var totalMin = 0, days = 0; for(var d in S.log){ totalMin += S.log[d].min; if(S.log[d].w+S.log[d].n+S.log[d].m+(S.log[d].o||0)>0) days++; }
   var bestW = 0; S.words.hist.forEach(function(h){ bestW=Math.max(bestW,h.ok); });
   var bestN = 0; S.nums.hist.forEach(function(h){ bestN=Math.max(bestN,h.ok); });
   var h = '<section class="view">';
@@ -821,14 +1732,14 @@ function renderProgreso(){
   h += '<div class="panel"><h3>Palabras por ronda</h3><div class="legend"><span><i style="background:var(--accent)"></i>recordadas</span><span><i style="background:var(--muted)"></i>mostradas</span></div>'+chart(S.words.hist,"var(--accent)","Palabras por ronda")+'</div>';
   h += '<div class="panel"><h3>Dígitos por ronda</h3>'+chart(S.nums.hist,"var(--brass)","Dígitos por ronda")+'</div>';
   h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>Copia de seguridad</h3><p class="small muted">Lleva tu progreso a otro dispositivo con un código.</p></div><button class="btn small" data-go="sync">Guardar / recuperar</button></div></div>'
-    + '</section>';
+    + obsProgressHTML() + '</section>';
   view.innerHTML = h;
   view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
 }
 
 /* ---------- boot ---------- */
 var startTab = "hoy";
-try{ var t = localStorage.getItem(KEY+".tab"); if(t && ["hoy","guia","palacio","palabras","numeros","mayor","progreso"].indexOf(t)>=0) startTab = t; }catch(e){}
+try{ var t = localStorage.getItem(KEY+".tab"); if(t && ["hoy","guia","palacio","palabras","numeros","mayor","obs","progreso"].indexOf(t)>=0) startTab = t; }catch(e){}
 save();
 go(startTab);
 })();
