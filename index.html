@@ -587,7 +587,7 @@ function renderHoy(){
   var wordsTarget = 2, numsTarget = w>=3 ? 1 : 0, majorTarget = w>=2 ? 20 : 0;
   var blocks = [];
   var ownPalace = S.palaces.some(function(p){ return p.name.indexOf("(ejemplo)")<0 && p.loci.filter(function(z){return norm(z);}).length>=10; });
-  if(w<=2 || !ownPalace) blocks.push({done:ownPalace, t:"Construye tu propio palacio", d: ownPalace ? "Listo. Usa siempre el mismo recorrido." : "10 lugares reales que conozcas de memoria · unos 5 min", prog:"", tab:"palacio"});
+  if(!ownPalace) blocks.push({done:false, t:"Construye tu propio palacio", d:"Tarea única · 10 lugares reales que conozcas de memoria · unos 5 min", prog:"", tab:"palacio"});
   blocks.push({done:l.w>=wordsTarget, t:"Palabras en el palacio", d:"2 rondas · unos 5 min", prog:l.w+" de "+wordsTarget, tab:"palabras"});
   if(majorTarget) blocks.push({done:l.m>=majorTarget, t:"Repaso del sistema mayor", d: majorFilled()<10 ? "Primero llena al menos 10 entradas de tu tabla" : "20 tarjetas · unos 5 min", prog:l.m+" de "+majorTarget, tab:"mayor"});
   else blocks.push({done:false, t:"Sistema mayor", d:"Empieza en la semana 2 de práctica. Puedes adelantarte y armar tu tabla.", prog:"", tab:"mayor", locked:true});
