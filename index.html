@@ -197,6 +197,30 @@ div.ccell{cursor:default}
 details.goals summary{cursor:pointer;list-style:none}
 details.goals summary::-webkit-details-marker{display:none}
 details.goals[open] summary{margin-bottom:8px}
+/* Rapidos */
+.qgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.qgrid .skill{background:var(--surface)}
+.denoms{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}
+.denom{padding:12px 6px;font-family:var(--f-mono)}
+.denom.bill{border-color:var(--ok);color:var(--ok)}
+.pyr{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0}
+.prow{display:flex;align-items:center;gap:6px}
+.pc{min-width:46px;height:42px;border:1px solid var(--line);border-radius:8px;display:grid;place-items:center;font:600 1.15rem var(--f-mono);background:var(--bg)}
+.pc.num{border-color:var(--accent)}
+.po{font:700 1.1rem var(--f-mono);color:var(--brass);min-width:16px;text-align:center}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.opt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:16px;text-align:left}
+.opt b{font-size:1.3rem}
+.ogrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:320px;width:100%;margin:0 auto}
+.ocell{aspect-ratio:1;border:1px solid var(--line);border-radius:9px;display:grid;place-items:center;font-size:1.3rem;background:var(--bg)}
+.btnc{appearance:none;background:var(--accent);border-color:var(--accent);cursor:pointer;color:var(--accent-ink)}
+.btnc.hit{background:color-mix(in srgb,var(--ok) 25%,var(--surface));color:var(--ink);border-color:var(--ok)}
+.btnc.fa,.btn.fa{background:color-mix(in srgb,var(--bad) 25%,var(--surface));color:var(--ink);border-color:var(--bad)}
+.btn.hit{background:color-mix(in srgb,var(--ok) 25%,var(--surface));border-color:var(--ok)}
+.pad{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.pad .btn{padding:12px 0;font-family:var(--f-mono)}
+.pad4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.pad4 .btn{padding:16px;font-size:1.05rem}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -216,6 +240,7 @@ details.goals[open] summary{margin-bottom:8px}
     <button class="tab" role="tab" data-tab="numeros">Números</button>
     <button class="tab" role="tab" data-tab="mayor">Sistema mayor</button>
     <button class="tab" role="tab" data-tab="obs">Observador</button>
+    <button class="tab" role="tab" data-tab="rapidos">Rápidos</button>
     <button class="tab" role="tab" data-tab="progreso">Progreso</button>
   </nav>
   <main id="view"></main>
@@ -315,7 +340,7 @@ function go(tab){
   for(var i=0;i<tabs.length;i++) tabs[i].setAttribute("aria-selected", tabs[i].getAttribute("data-tab")===tab ? "true":"false");
   header();
   if(tab==="guia" && !S.seenGuide){ S.seenGuide = true; save(); }
-  ({hoy:renderHoy, guia:renderGuia, sync:renderSync, palacio:renderPalacio, palabras:renderPalabras, numeros:renderNumeros, mayor:renderMayor, obs:renderObs, progreso:renderProgreso})[tab]();
+  ({hoy:renderHoy, guia:renderGuia, sync:renderSync, palacio:renderPalacio, palabras:renderPalabras, numeros:renderNumeros, mayor:renderMayor, obs:renderObs, rapidos:renderRapidos, progreso:renderProgreso})[tab]();
   try{ localStorage.setItem(KEY+".tab", tab); }catch(e){}
 }
 document.getElementById("tabs").addEventListener("click", function(e){ var t=e.target.closest(".tab"); if(t) go(t.getAttribute("data-tab")); });
@@ -1050,7 +1075,7 @@ var FIELD = {
 };
 var Ob = {mode:"menu"};
 
-function obsDefaults(){ return {clock:{level:1, good:0, hist:[]}, fermi:{hist:[]}, kim:{level:1, hist:[]}, change:{level:1, hist:[]}, flash:{level:1, good:0, hist:[]}, eye:{level:1, good:0, hist:[]}, calib:{hist:[]}, dow:{level:1, good:0, bad:0, hist:[]}, calc:{level:1, good:0, bad:0, cat:"all", hist:[]}, field:[], stride:0}; }
+function obsDefaults(){ var o = {clock:{level:1, good:0, hist:[]}, fermi:{hist:[]}, kim:{level:1, hist:[]}, change:{level:1, hist:[]}, flash:{level:1, good:0, hist:[]}, eye:{level:1, good:0, hist:[]}, calib:{hist:[]}, dow:{level:1, good:0, bad:0, hist:[]}, calc:{level:1, good:0, bad:0, cat:"all", hist:[]}, field:[], stride:0}; if(typeof QUICK!=="undefined" && QUICK) QUICK.forEach(function(q){ o["q_"+q[0]] = {level:1, hist:[]}; }); return o; }
 function obs(){ if(!S.obs) S.obs = obsDefaults(); var d = obsDefaults(); for(var k in d){ if(!(k in S.obs)) S.obs[k] = d[k]; } return S.obs; }
 function avg(a){ return a.length ? a.reduce(function(s,x){return s+x;},0)/a.length : null; }
 function fmtNum(n){
@@ -1991,7 +2016,7 @@ function calibCurve(){
 }
 function obsProgressHTML(){
   var O = obs(), cs = calibStats();
-  var any = O.clock.hist.length+O.fermi.hist.length+O.calc.hist.length+O.kim.hist.length+O.change.hist.length+O.flash.hist.length+O.eye.hist.length+O.calib.hist.length+O.dow.hist.length;
+  var any = QUICK.reduce(function(s,q){ return s+qState(q[0]).hist.length; },0)+O.clock.hist.length+O.fermi.hist.length+O.calc.hist.length+O.kim.hist.length+O.change.hist.length+O.flash.hist.length+O.eye.hist.length+O.calib.hist.length+O.dow.hist.length;
   if(!any) return '<div class="panel"><h3>Observador</h3><p class="small muted">Tus gráficas de observación y estimación aparecen aquí cuando hagas los primeros ejercicios.</p></div>';
   var bestClock = O.clock.hist.length ? Math.min.apply(null, O.clock.hist.map(function(h){ return h.err; })) : null;
   var dowOk = O.dow.hist.filter(function(h){ return h.ok; }), bestDow = dowOk.length ? Math.min.apply(null, dowOk.map(function(h){ return h.secs; })) : null;
@@ -2011,6 +2036,7 @@ function obsProgressHTML(){
   var calcOk = O.calc.hist.filter(function(x){ return x.ok; });
   sec("Cálculo mental", "Segundos por acierto. Más bajo es mejor. Aciertos en los últimos 20: <span class=\"mono\">"+(O.calc.hist.length?Math.round(O.calc.hist.slice(-20).filter(function(x){ return x.ok; }).length/Math.min(20,O.calc.hist.length)*100)+"%":"·")+"</span>.", seriesChart(calcOk.map(function(x){ return x.secs; }), "var(--brass)", "Cálculo mental"));
   sec("Día de la semana", "Segundos por acierto. Más bajo es mejor.", seriesChart(dowOk.map(function(x){ return x.secs; }), "var(--accent)", "Día de la semana"));
+  h += '<div class="panel"><h3>Rápidos: récords</h3>'+QUICK.map(function(q){ var b = qBest(q[0]), n = qState(q[0]).hist.length; return '<div class="res"><span>'+esc(q[1])+'</span><span class="mono">'+qFmt(q[3], b)+'</span><span class="small muted mono">'+n+'</span></div>'; }).join("")+'<p class="small muted">Contra reloj: segundos más 5 por error, menos es mejor. Memoria: el máximo alcanzado. Atención: porcentaje de aciertos. La última columna es cuántas veces lo has jugado.</p></div>';
   sec("Calibración", "Rangos del 90%: <span class=\"mono\">"+(cs.rangeHit==null?"·":Math.round(cs.rangeHit)+"%")+"</span> dentro en las últimas "+cs.rangeN+". Brier: <span class=\"mono\">"+(cs.brier==null?"·":cs.brier.toFixed(3))+"</span> en las últimas "+cs.tfN+".", calibCurve());
   return h;
 }
@@ -2056,6 +2082,423 @@ function renderProgreso(){
   view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
 }
 
+/* ---------- RAPIDOS ---------- */
+var QUICK = [
+  ["vuelto","Vuelto correcto","Arma el vuelto con la menor cantidad de billetes y monedas.","time"],
+  ["cadena","Resta en cadena","Resta el mismo número una y otra vez, de cabeza.","time"],
+  ["rafaga","Ráfaga de 20","Veinte operaciones seguidas contra reloj.","time"],
+  ["piramide","Pirámide","Opera los pares hacia abajo hasta llegar a un solo número.","time"],
+  ["conviene","¿Cuál conviene?","Elige la presentación más barata por unidad.","time"],
+  ["orden","De menor a mayor","Recuerda dónde estaban los números y tócalos en orden.","max"],
+  ["reves","Dígitos al revés","Escribe la secuencia de atrás hacia adelante.","max"],
+  ["suma2","Suma de los dos últimos","Suma cada número con el anterior antes de que cambie.","acc"],
+  ["nback","N atrás","Avisa cuando la figura sea igual a la de N pasos antes.","acc"],
+  ["gente","Conteo de gente","Cuenta cuántas personas quedan dentro de la casa.","acc"],
+  ["stroop","Colores","Toca el color de la letra, no lo que dice la palabra.","time"],
+  ["lapso","Lapso de tiempo","Calcula cuánto tiempo pasó entre dos relojes.","time"],
+  ["cubos","Contar cubos","Cuenta los cubos de la pila, incluidos los que no se ven.","time"]
+];
+var QUICK_BY = {}; QUICK.forEach(function(q){ QUICK_BY[q[0]] = {t:q[1], d:q[2], kind:q[3]}; });
+var Rq = {g:null};
+function now(){ return performance.now(); }
+function qState(id){ return obs()["q_"+id]; }
+function qScore(kind, h){ return kind==="time" ? h.secs + 5*(h.err||0) : h.score; }
+function qBest(id){ var k = QUICK_BY[id].kind, H = qState(id).hist; if(!H.length) return null; var v = H.map(function(h){ return qScore(k,h); }); return k==="time" ? Math.min.apply(null,v) : Math.max.apply(null,v); }
+function qFmt(kind, v){ return v==null ? "·" : kind==="time" ? v.toFixed(1)+" s" : kind==="acc" ? Math.round(v)+"%" : String(v); }
+function qAdaptTime(Q, err){ if(err===0) Q.level = Math.min(3, Q.level+1); else if(err>=3) Q.level = Math.max(1, Q.level-1); }
+function qAdaptAcc(Q, acc){ if(acc>=90) Q.level = Math.min(3, Q.level+1); else if(acc<60) Q.level = Math.max(1, Q.level-1); }
+function qFinish(id, entry, detail){
+  var Q = qState(id), kind = QUICK_BY[id].kind, prev = qBest(id);
+  entry.d = todayStr(); entry.ts = Date.now(); entry.lvl = Q.level;
+  if(kind==="time") qAdaptTime(Q, entry.err||0); else if(kind==="acc") qAdaptAcc(Q, entry.score);
+  Q.hist.push(entry); obsDone(); addMinutes((entry.dur||60)*1000); save();
+  var sc = qScore(kind, entry), rec = prev==null || (kind==="time" ? sc < prev : sc > prev);
+  stopTimer();
+  Rq = {g:id, ph:"result", entry:entry, sc:sc, rec:rec, prev:prev, detail:detail||""};
+  renderRapidos();
+}
+function qBack(){ return '<button class="btn small ghost" id="qBackBtn">Volver a Rápidos</button>'; }
+function qWire(){ var b = document.getElementById("qBackBtn"); if(b) b.onclick = function(){ stopTimer(); Rq = {g:null}; renderRapidos(); }; }
+function qSetup(id, text){
+  var Q = qState(id), b = qBest(id), k = QUICK_BY[id].kind;
+  view.innerHTML = '<section class="view"><div class="panel"><h2>'+esc(QUICK_BY[id].t)+'</h2><p class="muted">'+text+'</p>'
+    + '<p class="small muted">Nivel <span class="mono">'+Q.level+'</span> · récord <span class="mono">'+qFmt(k,b)+'</span>'+(k==="time"?' · cada error suma 5 s':'')+'</p>'
+    + '<div class="row"><button class="btn primary" id="qGo">Empezar</button>'+qBack()+'</div></div></section>';
+  qWire();
+  document.getElementById("qGo").onclick = function(){ GAMES[id].start(); };
+}
+function qPlay(head, body, foot){
+  view.innerHTML = '<section class="view"><div class="panel"><div class="row" style="justify-content:space-between"><h3>'+head+'</h3><span class="mono small muted" id="qClock"></span></div>'+body+(foot||'')+'<div class="row">'+qBack()+'</div></div></section>';
+  qWire();
+}
+function liveClock(){ stopTimer(); timerId = setInterval(function(){ var c = document.getElementById("qClock"); if(c && Rq.t0) c.textContent = ((now()-Rq.t0)/1000).toFixed(1)+" s"; }, 100); }
+function renderQResult(){
+  var id = Rq.g, q = QUICK_BY[id], e = Rq.entry, Q = qState(id);
+  var main = q.kind==="time" ? e.secs.toFixed(1)+' s' : q.kind==="acc" ? Math.round(e.score)+'%' : e.score;
+  var sub = q.kind==="time" ? (e.err ? e.err+' error'+(e.err>1?'es':'')+', puntaje '+Rq.sc.toFixed(1)+' s' : 'sin errores') : q.kind==="max" ? 'máximo alcanzado' : 'de aciertos';
+  var last = Q.hist.slice(-10).map(function(h){ return qScore(q.kind,h); });
+  view.innerHTML = '<section class="view"><div class="panel">'
+    + '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>'+esc(q.t)+'</h3><div class="big mono">'+main+'</div><p class="small muted">'+sub+'</p></div>'
+    + '<div style="text-align:right">'+(Rq.rec ? '<span class="badge">nuevo récord</span>' : '<p class="small muted">Récord: <span class="mono">'+qFmt(q.kind, Rq.prev)+'</span></p>')+'<p class="small muted">Nivel <span class="mono">'+Q.level+'</span></p></div></div>'
+    + (Rq.detail ? '<div class="small">'+Rq.detail+'</div>' : '')
+    + (last.length>1 ? '<h3>Tus últimas '+last.length+'</h3>'+spark(last, "var(--accent)") : '')
+    + '<div class="row"><button class="btn primary" id="qAgain">Otra vez</button>'+qBack()+'</div></div></section>';
+  qWire();
+  document.getElementById("qAgain").onclick = function(){ GAMES[id].start(); };
+}
+
+/* 1 Vuelto */
+var DENOMS = [20000,10000,5000,2000,1000,500,100,50,25,10,5];
+function greedyPieces(x){ var n = 0; DENOMS.forEach(function(d){ n += Math.floor(x/d); x %= d; }); return n; }
+function denomLabel(d){ return d>=1000 ? '₡'+(d/1000)+' mil' : '₡'+d; }
+var GAMES = {};
+GAMES.vuelto = {
+  setup:function(){ qSetup("vuelto", "Te digo cuánto cuesta algo y con qué billete pagas. Arma el vuelto tocando billetes y monedas de colones. Son 5 compras; si usas más piezas de las necesarias, cuenta como correcto pero te lo señalo."); },
+  start:function(){ Rq = {g:"vuelto", ph:"play", i:0, n:5, err:0, extra:0, t0:now(), msg:""}; this.item(); liveClock(); },
+  item:function(){
+    var L = qState("vuelto").level, price = L===1 ? ri(1,19)*50 : L===2 ? ri(4,199)*25 : ri(20,1999)*5;
+    var paid = [1000,2000,5000,10000,20000].filter(function(b){ return b>price; })[0];
+    Rq.price = price; Rq.paid = paid; Rq.picks = []; this.render();
+  },
+  render:function(){
+    var ch = Rq.paid - Rq.price, sum = Rq.picks.reduce(function(s,x){ return s+x; },0);
+    var body = '<h2>Compra '+crc(Rq.price)+' · pagas con '+crc(Rq.paid)+'</h2>'
+      + '<p class="muted">Llevas <b class="mono">'+crc(sum)+'</b> de vuelto'+(Rq.picks.length?' en '+Rq.picks.length+' pieza'+(Rq.picks.length>1?'s':''):'')+'.</p>'
+      + '<div class="denoms">'+DENOMS.filter(function(d){ return d<Rq.paid; }).map(function(d){ return '<button class="btn denom'+(d>=1000?' bill':'')+'" data-d="'+d+'">'+denomLabel(d)+'</button>'; }).join("")+'</div>'
+      + '<div class="row"><button class="btn primary" id="vOk">Listo</button><button class="btn small" id="vUndo"'+(Rq.picks.length?'':' disabled')+'>Deshacer</button><span class="small muted mono">'+(Rq.i+1)+' de '+Rq.n+'</span></div>'
+      + (Rq.msg ? '<p class="small muted">'+Rq.msg+'</p>' : '');
+    qPlay("Vuelto correcto", body); var self = this;
+    view.querySelectorAll("[data-d]").forEach(function(b){ b.onclick = function(){ Rq.picks.push(+b.getAttribute("data-d")); self.render(); }; });
+    document.getElementById("vUndo").onclick = function(){ Rq.picks.pop(); self.render(); };
+    document.getElementById("vOk").onclick = function(){
+      var s = Rq.picks.reduce(function(a,x){ return a+x; },0), ok = s===ch, g = greedyPieces(ch);
+      if(!ok){ Rq.err++; Rq.msg = "La anterior no: el vuelto era "+crc(ch)+"."; }
+      else if(Rq.picks.length>g){ Rq.extra++; Rq.msg = "La anterior estaba bien, pero se podía con "+g+" pieza"+(g>1?"s":"")+"."; }
+      else Rq.msg = "La anterior, perfecta.";
+      Rq.i++;
+      if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("vuelto", {secs:Math.round(secs*10)/10, err:Rq.err, extra:Rq.extra, dur:secs}, Rq.extra ? Rq.extra+' vuelto'+(Rq.extra>1?'s':'')+' con piezas de más. Truco: empieza siempre por la pieza más grande que quepa.' : 'Truco: cuenta hacia arriba desde el precio hasta lo que pagaste, como hacen los cajeros.'); return; }
+      self.item();
+    };
+  }
+};
+
+/* 2 Resta en cadena */
+GAMES.cadena = {
+  cfg:function(){ var L = qState("cadena").level; return L===1 ? {s:100, d:7, n:10} : L===2 ? {s:1000, d:7, n:12} : {s:1000, d:17, n:12}; },
+  setup:function(){ var c = this.cfg(); qSetup("cadena", "Empiezas en <b class=\"mono\">"+c.s+"</b> y restas <b class=\"mono\">"+c.d+"</b> una y otra vez. No verás el número anterior: lo llevas en la cabeza. Son "+c.n+" respuestas."); },
+  start:function(){ var c = this.cfg(); Rq = {g:"cadena", ph:"play", cur:c.s, d:c.d, n:c.n, i:0, err:0, t0:now(), msg:"Empieza en "+c.s+". Resta "+c.d+"."}; this.render(); liveClock(); },
+  render:function(){
+    var self = this;
+    qPlay("Resta en cadena", '<h2>− '+Rq.d+'</h2><p class="muted">'+esc(Rq.msg)+'</p><input id="cIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.4rem"><p class="small muted mono">'+Rq.i+' de '+Rq.n+'</p>');
+    var inp = document.getElementById("cIn"); inp.focus();
+    function check(force){
+      var want = Rq.cur - Rq.d, v = parseInt(inp.value,10);
+      if(v===want || force){
+        if(v!==want){ Rq.err++; Rq.msg = "No: era "+want+". Sigue desde ahí."; } else Rq.msg = "";
+        Rq.cur = want; Rq.i++;
+        if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("cadena", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, "Truco: resta en dos pasos, primero hasta la decena y luego el resto. 93 − 7 es 93 − 3 = 90, menos 4 = 86."); return; }
+        self.render();
+      }
+    }
+    inp.oninput = function(){ if(String(Rq.cur-Rq.d).length===inp.value.length) check(false); };
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") check(true); });
+  }
+};
+
+/* 3 Rafaga */
+GAMES.rafaga = {
+  gen:function(L){
+    var op = pick(L===1 ? ["+","−","×"] : ["+","−","×","÷"]), a, b, r;
+    if(op==="+"){ a = L===1?ri(1,9):L===2?ri(10,89):ri(15,99); b = L===1?ri(1,9):L===2?ri(2,9):ri(11,99); r = a+b; }
+    else if(op==="−"){ a = L===1?ri(5,18):L===2?ri(20,99):ri(40,150); b = L===1?ri(1,Math.min(9,a)):L===2?ri(2,19):ri(11,a-1); r = a-b; }
+    else if(op==="×"){ a = ri(2, L===1?9:12); b = ri(2, L===3?19:9); r = a*b; }
+    else { b = ri(2, L===3?12:9); r = ri(2, 9+L); a = b*r; }
+    return {q:a+" "+op+" "+b, a:r};
+  },
+  setup:function(){ qSetup("rafaga", "Veinte operaciones seguidas. Escribe el resultado y pasa solo a la siguiente cuando aciertes; con Enter saltas una que no sale (cuenta como error)."); },
+  start:function(){ var L = qState("rafaga").level, self = this; Rq = {g:"rafaga", ph:"play", list:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].map(function(){ return self.gen(L); }), i:0, err:0, t0:now()}; this.render(); liveClock(); },
+  render:function(){
+    var self = this, p = Rq.list[Rq.i];
+    qPlay("Ráfaga de 20", '<div class="stage"><div class="where">'+(Rq.i+1)+' de 20</div><div class="word mono">'+p.q+'</div></div><input id="rIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.4rem;text-align:center"><div class="meter"><i style="width:'+(Rq.i/20*100)+'%"></i></div>');
+    var inp = document.getElementById("rIn"); inp.focus();
+    function next(wrong){ if(wrong) Rq.err++; Rq.i++; if(Rq.i>=20){ var secs = (now()-Rq.t0)/1000; qFinish("rafaga", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, "En Brain Age la meta era bajar de 30 segundos sin errores en el nivel básico."); return; } self.render(); }
+    inp.oninput = function(){ if(parseInt(inp.value,10)===p.a) next(false); };
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") next(parseInt(inp.value,10)!==p.a); });
+  }
+};
+
+/* 4 Piramide */
+GAMES.piramide = {
+  gen:function(L){
+    var n = L===3 ? 4 : 3, ops = L===1 ? ["+","−"] : ["+","−","×"], rows = [[]], opsRows = [];
+    for(var i=0;i<n;i++) rows[0].push(ri(1, L===1?9:L===2?9:12));
+    for(var r=0; r<n-1; r++){
+      var cur = rows[r], o = [], nx = [];
+      for(var j=0;j<cur.length-1;j++){
+        var op = pick(ops); if(op==="×" && (cur[j]>12 || cur[j+1]>12)) op = "+";
+        if(op==="−" && cur[j]<cur[j+1]) op = "+";
+        o.push(op); nx.push(op==="+" ? cur[j]+cur[j+1] : op==="−" ? cur[j]-cur[j+1] : cur[j]*cur[j+1]);
+      }
+      opsRows.push(o); rows.push(nx);
+    }
+    return {top:rows[0], ops:opsRows, a:rows[n-1][0]};
+  },
+  html:function(p){
+    var h = '<div class="pyr">', n = p.top.length;
+    for(var r=0;r<n;r++){
+      var cells = [];
+      for(var j=0;j<n-r;j++){ cells.push(r===0 ? '<span class="pc num">'+p.top[j]+'</span>' : '<span class="pc">'+(r===n-1?'?':'')+'</span>'); if(j<n-r-1) cells.push('<span class="po">'+p.ops[r][j]+'</span>'); }
+      h += '<div class="prow">'+cells.join("")+'</div>';
+    }
+    return h+'</div>';
+  },
+  setup:function(){ qSetup("piramide", "Cada casilla de abajo sale de operar las dos de arriba con el signo que está entre ellas en su fila. Calcula la casilla final. Son 5 pirámides."); },
+  start:function(){ Rq = {g:"piramide", ph:"play", i:0, n:5, err:0, t0:now(), p:this.gen(qState("piramide").level)}; this.render(); liveClock(); },
+  render:function(){
+    var self = this;
+    qPlay("Pirámide", this.html(Rq.p)+'<input id="pIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.3rem;text-align:center" placeholder="casilla final"><p class="small muted mono">'+(Rq.i+1)+' de '+Rq.n+(Rq.msg?' · '+esc(Rq.msg):'')+'</p>');
+    var inp = document.getElementById("pIn"); inp.focus();
+    function next(){ var ok = parseInt(inp.value,10)===Rq.p.a; if(!ok){ Rq.err++; Rq.msg = "la anterior era "+Rq.p.a; } else Rq.msg = ""; Rq.i++;
+      if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("piramide", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, "Truco: guarda solo la fila que estás calculando; la de arriba ya no la necesitas."); return; }
+      Rq.p = self.gen(qState("piramide").level); self.render(); }
+    inp.oninput = function(){ if(parseInt(inp.value,10)===Rq.p.a) next(); };
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") next(); });
+  }
+};
+
+/* 5 Cual conviene */
+var PRODUCTS = [["arroz","g"],["café","g"],["aceite","ml"],["detergente","ml"],["galletas","g"],["azúcar","g"],["leche","ml"],["queso","g"]];
+GAMES.conviene = {
+  gen:function(){
+    var pr = pick(PRODUCTS), sizes = shuffle([250,400,500,750,800,1000,1500,1800,2000]).slice(0,2), u = 0.8 + Math.random()*5, pa, pb, ua, ub, g = 0;
+    do { pa = Math.round(sizes[0]*u*(0.85+Math.random()*0.3)/5)*5; pb = Math.round(sizes[1]*u*(0.85+Math.random()*0.3)/5)*5; ua = pa/sizes[0]; ub = pb/sizes[1]; g++; } while(Math.abs(ua-ub)/Math.min(ua,ub) < 0.04 && g<50);
+    return {p:pr[0], u:pr[1], a:{s:sizes[0], p:pa}, b:{s:sizes[1], p:pb}, best: ua<ub ? "a" : "b"};
+  },
+  setup:function(){ qSetup("conviene", "Dos presentaciones del mismo producto. Toca la que sale más barata por gramo o mililitro. Son 5 decisiones."); },
+  start:function(){ Rq = {g:"conviene", ph:"play", i:0, n:5, err:0, t0:now(), p:this.gen(), msg:""}; this.render(); liveClock(); },
+  render:function(){
+    var self = this, p = Rq.p, card = function(k, o){ return '<button class="btn opt" data-o="'+k+'"><span class="sk-t">'+esc(p.p)+'</span><b class="mono">'+o.s+' '+p.u+'</b><span class="mono">'+crc(o.p)+'</span></button>'; };
+    qPlay("¿Cuál conviene?", '<div class="opts">'+card("a",p.a)+card("b",p.b)+'</div><p class="small muted mono">'+(Rq.i+1)+' de '+Rq.n+'</p>'+(Rq.msg?'<p class="small muted">'+Rq.msg+'</p>':''));
+    view.querySelectorAll("[data-o]").forEach(function(b){ b.onclick = function(){
+      var ok = b.getAttribute("data-o")===p.best, pa = p.a.p/p.a.s*100, pb = p.b.p/p.b.s*100;
+      if(!ok) Rq.err++;
+      Rq.msg = (ok?"Bien. ":"No. ")+"Por cada 100 "+p.u+": "+crc(pa)+" contra "+crc(pb)+".";
+      Rq.i++;
+      if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("conviene", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, esc(Rq.msg)+" Truco: lleva ambos precios a la misma cantidad, por ejemplo a 100 g o a 1 kg, y compara."); return; }
+      Rq.p = self.gen(); self.render();
+    }; });
+  }
+};
+
+/* 6 De menor a mayor */
+GAMES.orden = {
+  setup:function(){ qSetup("orden", "Aparecen números en la cuadrícula por un momento y luego se tapan. Toca las casillas de menor a mayor. Si aciertas, la siguiente tiene un número más; si fallas, uno menos. Son 5 rondas."); },
+  start:function(){ Rq = {g:"orden", ph:"play", r:0, n:Math.max(3, qState("orden").level+2), best:0, t0:now()}; this.round(); },
+  round:function(){
+    var self = this, cells = shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0, Rq.n), nums = shuffle(Array.from({length:30},function(_,i){ return i+1; })).slice(0, Rq.n);
+    Rq.cells = cells; Rq.nums = nums; Rq.order = nums.map(function(v,i){ return [v, cells[i]]; }).sort(function(a,b){ return a[0]-b[0]; }).map(function(x){ return x[1]; }); Rq.step = 0;
+    var grid = []; for(var i=0;i<16;i++){ var k = cells.indexOf(i); grid.push('<div class="ocell">'+(k>=0 ? '<b class="mono">'+nums[k]+'</b>' : '')+'</div>'); }
+    qPlay("De menor a mayor · "+Rq.n+" números", '<div class="ogrid">'+grid.join("")+'</div><p class="small muted mono">ronda '+(Rq.r+1)+' de 5</p>');
+    oneShot(1200 + Rq.n*400, function(){ self.hide(); });
+  },
+  hide:function(){
+    var self = this, grid = []; for(var i=0;i<16;i++) grid.push(Rq.cells.indexOf(i)>=0 ? '<button class="ocell btnc" data-oc="'+i+'"></button>' : '<div class="ocell"></div>');
+    qPlay("De menor a mayor · "+Rq.n+" números", '<div class="ogrid">'+grid.join("")+'</div><p class="small muted mono">ronda '+(Rq.r+1)+' de 5 · toca en orden</p>');
+    view.querySelectorAll("[data-oc]").forEach(function(b){ b.onclick = function(){
+      var c = +b.getAttribute("data-oc"), k = Rq.cells.indexOf(c);
+      if(c===Rq.order[Rq.step]){ b.innerHTML = '<b class="mono">'+Rq.nums[k]+'</b>'; b.disabled = true; b.classList.add("hit"); Rq.step++; if(Rq.step===Rq.n){ Rq.best = Math.max(Rq.best, Rq.n); Rq.n++; self.next(true); } }
+      else { b.innerHTML = '<b class="mono">'+Rq.nums[k]+'</b>'; b.classList.add("fa"); Rq.n = Math.max(3, Rq.n-1); self.next(false); }
+    }; });
+  },
+  next:function(ok){
+    var self = this; Rq.r++;
+    view.querySelectorAll("[data-oc]").forEach(function(b){ b.disabled = true; });
+    oneShot(ok?500:1200, function(){
+      if(Rq.r>=5){ var Q = qState("orden"), secs = (now()-Rq.t0)/1000; Q.level = Math.max(1, (Rq.best||3)-2); qFinish("orden", {score:Rq.best, dur:secs}, "Truco: no memorices números, memoriza el recorrido. Primero ubica el menor, luego sigue la ruta."); return; }
+      self.round();
+    });
+  }
+};
+
+/* 7 Digitos al reves */
+GAMES.reves = {
+  setup:function(){ qSetup("reves", "Verás dígitos uno por uno. Al final escríbelos al revés: si viste 3 8 1, escribes 183. Si aciertas, la siguiente es un dígito más larga. Son 5 rondas."); },
+  start:function(){ Rq = {g:"reves", ph:"play", r:0, n:Math.max(3, qState("reves").level+2), best:0, t0:now()}; this.round(); },
+  round:function(){
+    var self = this; Rq.seq = []; for(var i=0;i<Rq.n;i++) Rq.seq.push(ri(0,9)); Rq.k = 0;
+    function show(){ qPlay("Dígitos al revés · "+Rq.n, '<div class="stage"><div class="where">'+(Rq.k+1)+' de '+Rq.n+'</div><div class="word mono" style="font-size:4rem">'+Rq.seq[Rq.k]+'</div></div>'); }
+    show(); stopTimer();
+    timerId = setInterval(function(){ Rq.k++; if(Rq.k>=Rq.n){ stopTimer(); self.ask(); } else show(); }, 1000);
+  },
+  ask:function(){
+    var self = this;
+    qPlay("Dígitos al revés · "+Rq.n, '<h2>Escríbelos al revés</h2><input id="dIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.4rem;letter-spacing:.2em"><div class="row"><button class="btn primary" id="dGo">Listo</button></div><p class="small muted mono">ronda '+(Rq.r+1)+' de 5</p>');
+    var inp = document.getElementById("dIn"); inp.focus();
+    function go2(){ var want = Rq.seq.slice().reverse().join(""), ok = inp.value.replace(/\D/g,"")===want; Rq.r++;
+      if(ok){ Rq.best = Math.max(Rq.best, Rq.n); Rq.n++; } else Rq.n = Math.max(3, Rq.n-1);
+      if(Rq.r>=5){ var secs = (now()-Rq.t0)/1000; qState("reves").level = Math.max(1, (Rq.best||3)-2); qFinish("reves", {score:Rq.best, dur:secs}, "La última era "+Rq.seq.join(" ")+" → "+want+". Truco: agrupa de dos en dos mientras los ves, y al final suelta los grupos al revés."); return; }
+      self.round(); }
+    document.getElementById("dGo").onclick = go2;
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+  }
+};
+
+/* 8 Suma de los dos ultimos */
+GAMES.suma2 = {
+  ms:function(){ return [null,2600,2000,1600][qState("suma2").level]; },
+  setup:function(){ qSetup("suma2", "Aparecen números uno tras otro, cada "+(this.ms()/1000).toLocaleString("es-CR")+" s. Desde el segundo, toca la suma del número actual con el anterior antes de que cambie. Son 12 números y 11 respuestas."); },
+  start:function(){ Rq = {g:"suma2", ph:"play", seq:Array.from({length:12},function(){ return ri(1,9); }), k:0, ok:0, ans:false, t0:now()}; this.tick(); },
+  tick:function(){
+    var self = this, k = Rq.k;
+    var pad = '<div class="pad">'+Array.from({length:17},function(_,i){ return '<button class="btn" data-s="'+(i+2)+'"'+(k===0?' disabled':'')+'>'+(i+2)+'</button>'; }).join("")+'</div>';
+    qPlay("Suma de los dos últimos", '<div class="stage"><div class="where">'+(k+1)+' de 12</div><div class="word mono" style="font-size:4rem">'+Rq.seq[k]+'</div></div>'+pad+'<p class="small muted mono" id="sMsg">'+(k===0?'Guarda este número.':'')+'</p>');
+    Rq.ans = false;
+    view.querySelectorAll("[data-s]").forEach(function(b){ b.onclick = function(){ if(Rq.ans) return; Rq.ans = true; var ok = +b.getAttribute("data-s")===Rq.seq[k]+Rq.seq[k-1]; if(ok) Rq.ok++; b.classList.add(ok?"hit":"fa"); view.querySelectorAll("[data-s]").forEach(function(x){ x.disabled = true; }); }; });
+    oneShot(this.ms(), function(){ Rq.k++; if(Rq.k>=12){ var acc = Rq.ok/11*100; qFinish("suma2", {score:Math.round(acc), dur:(now()-Rq.t0)/1000}, Rq.ok+" de 11 correctas. Lo difícil es soltar el número viejo: solo te sirve el último."); return; } self.tick(); });
+  }
+};
+
+/* 9 N atras */
+GAMES.nback = {
+  setup:function(){ var N = qState("nback").level; qSetup("nback", "Verás una figura tras otra. Toca <b>Igual</b> cuando la figura sea idéntica a la de <b>"+N+"</b> paso"+(N>1?"s":"")+" antes. Si no, no toques nada. Son "+(20+N)+" figuras."); },
+  start:function(){
+    var N = qState("nback").level, base = uniqueItems(6), seq = [];
+    for(var i=0;i<20+N;i++){ if(i>=N && Math.random()<0.3) seq.push(seq[i-N]); else { var it; do{ it = pick(base); } while(i>=N && it===seq[i-N]); seq.push(it); } }
+    Rq = {g:"nback", ph:"play", N:N, seq:seq, k:0, hits:0, fa:0, t0:now()}; this.tick();
+  },
+  tick:function(){
+    var self = this, k = Rq.k;
+    qPlay(Rq.N+" atrás", '<div class="stage"><div class="where">'+(k+1)+' de '+Rq.seq.length+'</div><div id="nbIcon">'+icon(Rq.seq[k], 110)+'</div></div><div class="row" style="justify-content:center"><button class="btn primary" id="nbYes" style="min-width:180px;padding:18px">Igual</button></div>');
+    Rq.pressed = false;
+    document.getElementById("nbYes").onclick = function(){ if(Rq.pressed) return; Rq.pressed = true; var m = k>=Rq.N && Rq.seq[k]===Rq.seq[k-Rq.N]; if(m) Rq.hits++; else Rq.fa++; this.classList.add(m?"hit":"fa"); this.disabled = true; };
+    oneShot(2200, function(){ var el = document.getElementById("nbIcon"); Rq.k++; if(Rq.k>=Rq.seq.length){ var m = 0; for(var i=Rq.N;i<Rq.seq.length;i++) if(Rq.seq[i]===Rq.seq[i-Rq.N]) m++; var acc = Math.max(0, (Rq.hits-Rq.fa))/Math.max(1,m)*100; qFinish("nback", {score:Math.round(acc), dur:(now()-Rq.t0)/1000}, Rq.hits+" de "+m+" coincidencias detectadas, "+Rq.fa+" falsa"+(Rq.fa===1?"":"s")+" alarma"+(Rq.fa===1?"":"s")+". Con 90% o más pasas a "+Math.min(3,Rq.N+1)+" atrás."); return; } self.tick(); });
+  }
+};
+
+/* 10 Conteo de gente */
+GAMES.gente = {
+  setup:function(){ qSetup("gente", "Hay personas dentro de una casa. Entrarán y saldrán grupos; al final dices cuántas quedaron adentro. Son 3 casas."); },
+  start:function(){ Rq = {g:"gente", ph:"play", r:0, ok:0, t0:now()}; this.round(); },
+  round:function(){
+    var L = qState("gente").level, inside = ri(0,3), ev = [], k = L===1?5:L===2?7:9, cur = inside;
+    for(var i=0;i<k;i++){ var out = cur>0 && Math.random()<0.45, n = out ? ri(1, Math.min(cur, L===1?2:3)) : ri(1, L===1?2:4); ev.push({out:out, n:n}); cur += out ? -n : n; }
+    Rq.ev = ev; Rq.inside0 = inside; Rq.final = cur; Rq.e = -1; Rq.dur = L===3 ? 900 : 1200;
+    this.scene('<p class="muted">Al principio hay <b class="mono">'+inside+'</b> persona'+(inside===1?'':'s')+' adentro.</p>');
+    var self = this; oneShot(1800, function(){ self.step(); });
+  },
+  svg:function(figs){
+    var house = '<rect x="130" y="60" width="70" height="70" fill="var(--soft)" stroke="var(--muted)" stroke-width="2"/><polygon points="122,62 165,25 208,62" fill="var(--brass)"/><rect x="157" y="98" width="16" height="32" fill="var(--muted)"/>';
+    return '<svg viewBox="0 0 330 150" width="100%" style="max-width:480px" role="img" aria-label="Casa">'+'<line x1="0" y1="130" x2="330" y2="130" stroke="var(--line)" stroke-width="2"/>'+figs+house+'</svg>';
+  },
+  scene:function(extra){ qPlay("Conteo de gente · casa "+(Rq.r+1)+" de 3", '<div style="display:flex;justify-content:center">'+this.svg('<g id="figs"></g>')+'</div>'+(extra||'')); },
+  step:function(){
+    var self = this; Rq.e++;
+    if(Rq.e>=Rq.ev.length){ return this.ask(); }
+    var e = Rq.ev[Rq.e], figs = "";
+    for(var i=0;i<e.n;i++){ var x0 = e.out ? 165 : -20 - i*18, x1 = e.out ? 350 + i*18 : 165; figs += '<g class="fig" style="transform:translateX('+(x0 - i*(e.out?-18:0))+'px);transition:transform '+(Rq.dur-150)+'ms linear" data-x1="'+x1+'"><circle cx="0" cy="98" r="6" fill="var(--ink)"/><rect x="-5" y="105" width="10" height="22" rx="4" fill="var(--ink)"/></g>'; }
+    this.scene(); document.getElementById("figs").outerHTML = figs;
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ view.querySelectorAll(".fig").forEach(function(f){ f.style.transform = "translateX("+f.getAttribute("data-x1")+"px)"; }); }); });
+    oneShot(Rq.dur, function(){ self.step(); });
+  },
+  ask:function(){
+    var self = this;
+    qPlay("Conteo de gente · casa "+(Rq.r+1)+" de 3", '<div style="display:flex;justify-content:center">'+this.svg("")+'</div><h2>¿Cuántas personas quedaron adentro?</h2><input id="gIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.3rem"><div class="row"><button class="btn primary" id="gOk">Responder</button></div>');
+    var inp = document.getElementById("gIn"); inp.focus();
+    function go2(){ var ok = parseInt(inp.value,10)===Rq.final; if(ok) Rq.ok++; Rq.r++;
+      if(Rq.r>=3){ qFinish("gente", {score:Math.round(Rq.ok/3*100), dur:(now()-Rq.t0)/1000}, "La última casa terminó con "+Rq.final+". Truco: no cuentes figuras, lleva un solo número y súmale o réstale a cada grupo."); return; }
+      self.round(); }
+    document.getElementById("gOk").onclick = go2;
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+  }
+};
+
+/* 11 Stroop */
+var STROOP = [["ROJO","#E4572E"],["AZUL","#2C7BE5"],["VERDE","#29A36A"],["AMARILLO","#F3A712"]];
+GAMES.stroop = {
+  setup:function(){ qSetup("stroop", "Aparece el nombre de un color escrito con tinta de otro color. Toca el botón del color de la <b>tinta</b>, no lo que dice la palabra. Son 16."); },
+  start:function(){ Rq = {g:"stroop", ph:"play", i:0, n:16, err:0, t0:now(), order:[0,1,2,3]}; this.item(); liveClock(); },
+  item:function(){ var w = ri(0,3), c = Math.random()<0.75 ? (w + ri(1,3))%4 : w; Rq.w = w; Rq.c = c; if(qState("stroop").level>=2) Rq.order = shuffle([0,1,2,3]); this.render(); },
+  render:function(){
+    var self = this;
+    qPlay("Colores", '<div class="stage"><div class="where">'+(Rq.i+1)+' de '+Rq.n+'</div><div class="word" style="color:'+STROOP[Rq.c][1]+'">'+STROOP[Rq.w][0]+'</div></div><div class="pad4">'+Rq.order.map(function(i){ return '<button class="btn" data-c="'+i+'">'+STROOP[i][0].toLowerCase()+'</button>'; }).join("")+'</div>');
+    view.querySelectorAll("[data-c]").forEach(function(b){ b.onclick = function(){ if(+b.getAttribute("data-c")!==Rq.c) Rq.err++; Rq.i++;
+      if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("stroop", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, "Leer es automático; frenarlo es trabajo del control ejecutivo. Truco: desenfoca un poco la vista y fíjate solo en la mancha de color."); return; }
+      self.item(); }; });
+  }
+};
+
+/* 12 Lapso de tiempo */
+function clockSVG(h, m){
+  var a = (h%12 + m/60)*30*Math.PI/180, b = m*6*Math.PI/180, ticks = "";
+  for(var i=0;i<12;i++){ var t = i*30*Math.PI/180; ticks += '<line x1="'+(50+Math.sin(t)*40).toFixed(1)+'" y1="'+(50-Math.cos(t)*40).toFixed(1)+'" x2="'+(50+Math.sin(t)*(i%3?36:32)).toFixed(1)+'" y2="'+(50-Math.cos(t)*(i%3?36:32)).toFixed(1)+'" stroke="var(--muted)" stroke-width="'+(i%3?1.5:2.5)+'"/>'; }
+  return '<svg viewBox="0 0 100 100" width="130" height="130" role="img" aria-label="Reloj"><circle cx="50" cy="50" r="45" fill="var(--bg)" stroke="var(--ink)" stroke-width="2.5"/>'+ticks
+    + '<line x1="50" y1="50" x2="'+(50+Math.sin(a)*22).toFixed(1)+'" y2="'+(50-Math.cos(a)*22).toFixed(1)+'" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>'
+    + '<line x1="50" y1="50" x2="'+(50+Math.sin(b)*34).toFixed(1)+'" y2="'+(50-Math.cos(b)*34).toFixed(1)+'" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/><circle cx="50" cy="50" r="3" fill="var(--ink)"/></svg>';
+}
+GAMES.lapso = {
+  gen:function(){ var L = qState("lapso").level, step = L===1 ? 15 : 5, t1 = ri(0, 720/step-1)*step, d = ri(1, (L===3?715:L===2?360:240)/step)*step; return {t1:t1, t2:(t1+d)%720, d:d}; },
+  setup:function(){ qSetup("lapso", "Dos relojes de agujas. Calcula cuánto tiempo pasó del primero al segundo, siempre hacia adelante y en menos de 12 horas. Son 5."); },
+  start:function(){ Rq = {g:"lapso", ph:"play", i:0, n:5, err:0, t0:now(), p:this.gen(), msg:""}; this.render(); liveClock(); },
+  render:function(){
+    var self = this, p = Rq.p;
+    qPlay("Lapso de tiempo", '<div class="row" style="justify-content:center;gap:24px">'+clockSVG(Math.floor(p.t1/60), p.t1%60)+'<span class="muted" style="font-size:1.6rem">→</span>'+clockSVG(Math.floor(p.t2/60), p.t2%60)+'</div>'
+      + '<div class="row"><label class="small muted" style="flex:1 1 100px">Horas<input id="lH" inputmode="numeric" autocomplete="off" class="mono"></label><label class="small muted" style="flex:1 1 100px">Minutos<input id="lM" inputmode="numeric" autocomplete="off" class="mono"></label></div>'
+      + '<div class="row"><button class="btn primary" id="lGo">Responder</button><span class="small muted mono">'+(Rq.i+1)+' de '+Rq.n+'</span></div>'+(Rq.msg?'<p class="small muted">'+Rq.msg+'</p>':''));
+    var hI = document.getElementById("lH"), mI = document.getElementById("lM"); hI.focus();
+    function go2(){ var v = (parseInt(hI.value,10)||0)*60 + (parseInt(mI.value,10)||0), ok = v===p.d; if(!ok){ Rq.err++; Rq.msg = "La anterior era "+Math.floor(p.d/60)+" h "+p.d%60+" min."; } else Rq.msg = ""; Rq.i++;
+      if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("lapso", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, "Truco: cuenta primero las horas completas y después ajusta los minutos."); return; }
+      Rq.p = self.gen(); self.render(); }
+    document.getElementById("lGo").onclick = go2;
+    mI.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+    hI.addEventListener("keydown", function(e){ if(e.key==="Enter") mI.focus(); });
+  }
+};
+
+/* 13 Contar cubos */
+GAMES.cubos = {
+  gen:function(){
+    var L = qState("cubos").level, nx = L===1?2:3, ny = L===3?4:L===2?3:2, mh = L===1?2:3, h = [];
+    for(var x=0;x<nx;x++){ h.push([]); for(var y=0;y<ny;y++) h[x].push(ri(0,mh)); }
+    for(x=nx-1;x>=0;x--) for(y=ny-1;y>=0;y--){ if(x+1<nx) h[x][y] = Math.max(h[x][y], h[x+1][y]); if(y+1<ny) h[x][y] = Math.max(h[x][y], h[x][y+1]); }
+    if(h[0][0]===0) h[0][0] = 1;
+    var tot = 0; h.forEach(function(r){ r.forEach(function(v){ tot += v; }); });
+    return {h:h, nx:nx, ny:ny, a:tot};
+  },
+  svg:function(p){
+    var W = 30, H = 15, Z = 30, items = [];
+    for(var x=0;x<p.nx;x++) for(var y=0;y<p.ny;y++) for(var z=0;z<p.h[x][y];z++) items.push([x,y,z]);
+    items.sort(function(a,b){ return (a[0]+a[1])-(b[0]+b[1]) || a[2]-b[2]; });
+    var g = "", ox = 160, oy = 70;
+    items.forEach(function(c){
+      var sx = ox + (c[0]-c[1])*W, sy = oy + (c[0]+c[1])*H - c[2]*Z;
+      var top = [[sx,sy],[sx+W,sy+H],[sx,sy+2*H],[sx-W,sy+H]], left = [[sx-W,sy+H],[sx,sy+2*H],[sx,sy+2*H+Z],[sx-W,sy+H+Z]], right = [[sx,sy+2*H],[sx+W,sy+H],[sx+W,sy+H+Z],[sx,sy+2*H+Z]];
+      var P = function(a){ return a.map(function(q){ return q[0].toFixed(1)+","+q[1].toFixed(1); }).join(" "); };
+      g += '<polygon points="'+P(top)+'" fill="var(--soft)" stroke="var(--ink)" stroke-width="1.2"/><polygon points="'+P(left)+'" fill="var(--accent)" fill-opacity=".55" stroke="var(--ink)" stroke-width="1.2"/><polygon points="'+P(right)+'" fill="var(--accent)" fill-opacity=".85" stroke="var(--ink)" stroke-width="1.2"/>';
+    });
+    return '<svg viewBox="0 0 320 260" width="100%" style="max-width:360px" role="img" aria-label="Pila de cubos">'+g+'</svg>';
+  },
+  setup:function(){ qSetup("cubos", "Una pila de cubos sobre una base. Ningún cubo flota: si ves uno arriba, tiene otros debajo aunque no se vean. Escribe cuántos hay en total. Son 5 pilas."); },
+  start:function(){ Rq = {g:"cubos", ph:"play", i:0, n:5, err:0, t0:now(), p:this.gen(), msg:""}; this.render(); liveClock(); },
+  render:function(){
+    var self = this;
+    qPlay("Contar cubos", '<div style="display:flex;justify-content:center">'+this.svg(Rq.p)+'</div><input id="cbIn" inputmode="numeric" autocomplete="off" class="mono" style="font-size:1.3rem;text-align:center" placeholder="cubos en total"><p class="small muted mono">'+(Rq.i+1)+' de '+Rq.n+(Rq.msg?' · '+esc(Rq.msg):'')+'</p>');
+    var inp = document.getElementById("cbIn"); inp.focus();
+    function go2(){ var ok = parseInt(inp.value,10)===Rq.p.a; if(!ok){ Rq.err++; Rq.msg = "la anterior tenía "+Rq.p.a; } else Rq.msg = ""; Rq.i++;
+      if(Rq.i>=Rq.n){ var secs = (now()-Rq.t0)/1000; qFinish("cubos", {secs:Math.round(secs*10)/10, err:Rq.err, dur:secs}, "Truco: cuenta por columnas. Mira cada cara de arriba, di su altura y suma."); return; }
+      Rq.p = self.gen(); self.render(); }
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter") go2(); });
+    inp.oninput = function(){ if(parseInt(inp.value,10)===Rq.p.a) go2(); };
+  }
+};
+
+function renderRapidos(){
+  if(Rq.g){ if(Rq.ph==="result") return renderQResult(); if(Rq.ph==="setup" || !Rq.ph) return GAMES[Rq.g].setup(); return GAMES[Rq.g].render ? GAMES[Rq.g].render() : GAMES[Rq.g].setup(); }
+  var h = '<section class="view"><div class="panel"><h2>Rápidos</h2><p class="muted">Ejercicios de uno o dos minutos para agilidad mental: cálculo, memoria de trabajo y atención. Cada uno guarda tu récord y sube de nivel solo.</p></div>';
+  h += '<div class="qgrid">'+QUICK.map(function(q){ var b = qBest(q[0]), Q = qState(q[0]); return '<button class="skill" data-q="'+q[0]+'"><span class="sk-t">'+(q[3]==="time"?"contra reloj":q[3]==="max"?"memoria":"atención")+'</span><span style="font-weight:600">'+esc(q[1])+'</span><span class="sk-s">'+esc(q[2])+'</span><span class="small mono" style="color:var(--brass)">récord '+qFmt(q[3],b)+' · nivel '+Q.level+'</span></button>'; }).join("")+'</div></section>';
+  view.innerHTML = h;
+  view.querySelectorAll("[data-q]").forEach(function(b){ b.onclick = function(){ Rq = {g:b.getAttribute("data-q"), ph:"setup"}; renderRapidos(); }; });
+}
+
 /* ---------- ENTRENAMIENTO GUIADO ---------- */
 var STEP_INFO = {
   calc:{t:"Cálculo mental", g:"Calentamiento", n:5, min:2},
@@ -2071,6 +2514,7 @@ var STEP_INFO = {
   dow:{t:"Día de la semana", g:"Razonamiento", n:3, min:3},
   tf:{t:"Verdadero o falso", g:"Calibración", n:4, min:2}
 };
+function stepInfo(k){ if(k.indexOf("q_")===0){ var q = QUICK_BY[k.slice(2)]; return {t:q.t, g:"Agilidad", n:1, min:2}; } return STEP_INFO[k]; }
 function stepCount(k){
   var O = obs();
   if(k==="palabras") return S.words.hist.length;
@@ -2081,13 +2525,14 @@ function stepCount(k){
 }
 function buildPlan(){
   var w = weekNum(), seed = Math.abs(daysBetween("2026-01-01", todayStr())), obsA = seed%2 ? "kim" : "change", obsB = seed%2 ? "change" : "kim";
-  var est = ["flash","eye","clock","fermi"][seed%4], steps = ["calc","palabras",obsA,est];
+  var est = ["flash","eye","clock","fermi"][seed%4], qA = "q_"+QUICK[seed%QUICK.length][0], qB = "q_"+QUICK[(seed+6)%QUICK.length][0];
+  var steps = [qA,"palabras",obsA,est];
   var due = dueList().length;
-  if(w>=2 && majorFilled()>=10 && due) steps.push("mayor"); else steps.push("dow");
+  if(w>=2 && majorFilled()>=10 && due) steps.push("mayor"); else steps.push(seed%2 ? "calc" : "dow");
   steps.push(w>=3 ? "numeros" : obsB);
   steps.push("palabras");
-  steps.push(steps.indexOf("dow")>=0 || seed%3 ? "tf" : "dow");
-  return steps.map(function(k){ return {k:k, n:k==="mayor" ? Math.min(20, due) : STEP_INFO[k].n}; });
+  steps.push(seed%2 ? qB : "tf");
+  return steps.map(function(k){ return {k:k, n:k==="mayor" ? Math.min(20, due) : stepInfo(k).n}; });
 }
 function guided(){ var g = S.guided; return g && g.date===todayStr() ? g : null; }
 function guidedActive(){ var g = guided(); return g && !g.done && g.idx < g.steps.length; }
@@ -2095,6 +2540,7 @@ function startGuided(){ S.guided = {date:todayStr(), steps:buildPlan(), idx:0, d
 function startStep(i){
   var g = guided(); g.idx = i; var st = g.steps[i]; st.base = stepCount(st.k); st.ts0 = Date.now(); save();
   var k = st.k;
+  if(k.indexOf("q_")===0){ Rq = {g:k.slice(2), ph:"setup"}; go("rapidos"); return; }
   if(k==="palabras"){ W = {phase:"setup"}; go("palabras"); return; }
   if(k==="numeros"){ Nm = {phase:"setup"}; go("numeros"); return; }
   if(k==="mayor"){ Q = null; go("mayor"); var qs = document.getElementById("qStart"); if(qs && !qs.disabled) qs.click(); return; }
@@ -2112,6 +2558,7 @@ function stepResult(st){
   var O = obs(), t0 = st.ts0||0, t1 = st.ts1||Infinity;
   function inR(h){ return h.ts>=t0 && h.ts<=t1; }
   var k = st.k, H;
+  if(k.indexOf("q_")===0){ var qid = k.slice(2), qk = QUICK_BY[qid].kind; H = O[k].hist.filter(inR); return H.length ? qFmt(qk, qScore(qk, H[H.length-1])) : "omitido"; }
   if(k==="calc"){ H = O.calc.hist.filter(inR); return H.length ? H.filter(function(h){ return h.ok; }).length+" de "+H.length+" correctas" : "omitido"; }
   if(k==="palabras" || k==="numeros"){ H = (k==="palabras"?S.words:S.nums).hist.filter(inR); return H.length ? H.map(function(h){ return h.ok+" de "+h.n; }).join(", ") : "omitido"; }
   if(k==="mayor"){ var n = stepCount("mayor") - (st.base||0); return n>0 ? n+" tarjetas" : "omitido"; }
@@ -2124,14 +2571,14 @@ function stepResult(st){
   return "";
 }
 function guidedPanel(){
-  var g = guided(), plan = g ? g.steps : buildPlan(), mins = plan.reduce(function(s,x){ return s + STEP_INFO[x.k].min; }, 0);
-  var list = function(cur){ return '<ol class="gsteps">'+plan.map(function(st,i){ var I = STEP_INFO[st.k], cls = g && (i<g.idx || g.done) ? "done" : (cur && g && i===g.idx ? "cur" : ""); return '<li class="'+cls+'"><span class="sk-t">'+esc(I.g)+'</span><span>'+esc(I.t)+'</span>'+(g && g.done ? '<span class="mono small muted">'+esc(stepResult(st))+'</span>' : '')+'</li>'; }).join("")+'</ol>'; };
+  var g = guided(), plan = g ? g.steps : buildPlan(), mins = plan.reduce(function(s,x){ return s + stepInfo(x.k).min; }, 0);
+  var list = function(cur){ return '<ol class="gsteps">'+plan.map(function(st,i){ var I = stepInfo(st.k), cls = g && (i<g.idx || g.done) ? "done" : (cur && g && i===g.idx ? "cur" : ""); return '<li class="'+cls+'"><span class="sk-t">'+esc(I.g)+'</span><span>'+esc(I.t)+'</span>'+(g && g.done ? '<span class="mono small muted">'+esc(stepResult(st))+'</span>' : '')+'</li>'; }).join("")+'</ol>'; };
   if(g && g.done){
     return '<div class="panel gpanel"><h3>Entrenamiento de hoy</h3><h2>Completado</h2><p class="muted small">Resumen de lo que hiciste hoy. Mañana la combinación cambia.</p>'+list(false)
       + '<div class="row"><button class="btn small" data-go="obs">Práctica libre</button><button class="btn small ghost" id="gAgain">Repetir el entrenamiento</button></div></div>';
   }
   if(g){
-    var cur = STEP_INFO[g.steps[g.idx].k];
+    var cur = stepInfo(g.steps[g.idx].k);
     return '<div class="panel gpanel"><h3>Entrenamiento de hoy · paso '+(g.idx+1)+' de '+g.steps.length+'</h3><h2>'+esc(cur.t)+'</h2>'+list(true)
       + '<div class="row"><button class="btn primary" id="gGo">Continuar</button></div></div>';
   }
@@ -2145,7 +2592,7 @@ function wireGuidedPanel(){
 function guidedBar(){
   if(!guidedActive() || ["hoy","guia","progreso","sync","palacio"].indexOf(current)>=0) return;
   var sec = view.querySelector("section.view"); if(!sec || sec.querySelector("#gbar")) return;
-  var g = guided(), st = g.steps[g.idx], I = STEP_INFO[st.k], have = Math.max(0, stepCount(st.k) - (st.base||0)), ready = have >= st.n, last = g.idx === g.steps.length-1;
+  var g = guided(), st = g.steps[g.idx], I = stepInfo(st.k), have = Math.max(0, stepCount(st.k) - (st.base||0)), ready = have >= st.n, last = g.idx === g.steps.length-1;
   var bar = document.createElement("div");
   bar.className = "panel gbar"; bar.id = "gbar";
   bar.innerHTML = '<div style="min-width:0"><h3>Entrenamiento · paso '+(g.idx+1)+' de '+g.steps.length+'</h3><div class="small"><b>'+esc(I.t)+'</b> · <span class="mono">'+Math.min(have, st.n)+' de '+st.n+'</span></div>'
@@ -2160,7 +2607,7 @@ new MutationObserver(function(){ guidedBar(); }).observe(view, {childList:true})
 
 /* ---------- boot ---------- */
 var startTab = "hoy";
-try{ var t = localStorage.getItem(KEY+".tab"); if(t && ["hoy","guia","palacio","palabras","numeros","mayor","obs","progreso"].indexOf(t)>=0) startTab = t; }catch(e){}
+try{ var t = localStorage.getItem(KEY+".tab"); if(t && ["hoy","guia","palacio","palabras","numeros","mayor","obs","rapidos","progreso"].indexOf(t)>=0) startTab = t; }catch(e){}
 save();
 go(startTab);
 })();
