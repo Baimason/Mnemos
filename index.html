@@ -221,6 +221,8 @@ details.goals[open] summary{margin-bottom:8px}
 .pad .btn{padding:12px 0;font-family:var(--f-mono)}
 .pad4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .pad4 .btn{padding:16px;font-size:1.05rem}
+.factline{padding:4px 4px 0;display:flex;flex-direction:column;gap:4px;max-width:70ch}
+.factline .sk-t{margin-right:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -443,6 +445,8 @@ function renderGuia(){
     + '<li>Lichtenstein, S., Fischhoff, B. y Phillips, L. D. (1982). Calibration of probabilities: the state of the art to 1980. En Kahneman, Slovic y Tversky (Eds.), <i>Judgment under Uncertainty</i>. Cambridge University Press.</li>'
     + '<li>Weinstein, L. y Adam, J. A. (2008). <i>Guesstimation</i>. Princeton University Press.</li></ul>'
     + '<h3>Ejercicios y técnicas</h3><ul class="refs">'
+    + '<li>Stroop, J. R. (1935). Studies of interference in serial verbal reactions. <i>Journal of Experimental Psychology</i>, 18(6), 643 a 662.</li>'
+    + '<li>Ebbinghaus, H. (1885). <i>Über das Gedächtnis</i>. Duncker und Humblot.</li>'
     + '<li>Conway, J. H. (1973). Tomorrow is the day after Doomsday. <i>Eureka</i>, 36, 28 a 31.</li>'
     + '<li>Berlekamp, E., Conway, J. H. y Guy, R. (1982). <i>Winning Ways for Your Mathematical Plays</i>. Academic Press.</li>'
     + '<li>Kipling, R. (1901). <i>Kim</i>. Macmillan (origen del juego de Kim).</li>'
@@ -549,6 +553,22 @@ function renderSync(){
 }
 
 /* ---------- HOY ---------- */
+var FACTS = [
+  ["Principiantes que entrenaron el método de loci 30 minutos al día durante 6 semanas pasaron de recordar unas 26 palabras a más de 60, y lo mantuvieron meses después.", "Dresler y colaboradores, Neuron, 2017"],
+  ["Los campeones de memoria no tienen cerebros fuera de lo común. La diferencia está en la estrategia: casi todos usan rutas espaciales, como el palacio de la memoria.", "Maguire y colaboradores, Nature Neuroscience, 2003"],
+  ["Al juzgar si alguien miente, la gente acierta en promedio un 54% de las veces, apenas mejor que lanzar una moneda. Policías y jueces no lo hacen mucho mejor.", "Bond y DePaulo, 2006"],
+  ["Con solo ver el cuarto de un desconocido, la gente juzga su apertura a la experiencia tan bien como sus amigos cercanos, o mejor.", "Gosling y colaboradores, 2002"],
+  ["Clips mudos de unos 30 segundos de un profesor dando clase bastaron para predecir cómo lo evaluarían sus estudiantes al final del semestre.", "Ambady y Rosenthal, 1993"],
+  ["Cuando la gente da un rango en el que está 90% segura, la respuesta real suele quedar fuera muchas más veces de lo esperado. Es el sesgo de sobreconfianza.", "Lichtenstein, Fischhoff y Phillips, 1982"],
+  ["Personas comunes entrenadas en calibrar sus probabilidades llegaron a pronosticar eventos mundiales mejor que analistas con acceso a información clasificada.", "Tetlock y Gardner, Superforecasting, 2015"],
+  ["En la primera prueba nuclear, Enrico Fermi dejó caer papelitos al pasar la onda expansiva y, por cuánto se movieron, estimó la potencia de la explosión del orden correcto.", "Relato histórico de la prueba Trinity, 1945"],
+  ["El puntaje que usa Calibración se inventó para evaluar pronósticos del clima: mide qué tan buenas eran las probabilidades, no solo si acertaste.", "Brier, Monthly Weather Review, 1950"],
+  ["John Ridley Stroop publicó en 1935 que nombrar el color de la tinta cuesta más cuando la palabra dice otro color. Es de los efectos más replicados de la psicología.", "Stroop, 1935"],
+  ["John Conway practicaba el algoritmo Doomsday con su computadora hasta calcular el día de la semana de cualquier fecha en unos 2 segundos.", "Conway, 1973"],
+  ["En la novela de Kipling, el juego de las piedras escondidas entrenaba a un joven espía para observar. Después los scouts lo adoptaron como ejercicio.", "Kipling, 1901; Baden-Powell, 1908"],
+  ["Un estudio con más de 11 000 personas encontró que el entrenamiento cerebral mejora mucho las tareas practicadas, pero muy poco las que no se practicaron.", "Owen y colaboradores, Nature, 2010"],
+  ["Sin repaso, olvidamos buena parte de lo aprendido en pocos días. Repasar justo antes de olvidar es la base de las tarjetas del sistema mayor.", "Ebbinghaus, 1885"]
+];
 var TRICKS = [
   ["Grados con la mano", "Con el brazo estirado: meñique ≈ 1°, tres dedos ≈ 5°, puño ≈ 10°, palmo abierto ≈ 20°. Mide los tuyos una vez."],
   ["Distancia por tamaño conocido", "Distancia ≈ tamaño del objeto × 57 ÷ grados que ocupa. Una persona de 1,7 m que cabe detrás del meñique está a unos 100 m."],
@@ -574,6 +594,7 @@ var TRICKS = [
   ["Comportamiento base", "Antes de interpretar a alguien, fíjate cómo actúa normalmente. Importan los cambios respecto a esa base, no los gestos sueltos."],
   ["Escaleras de Holmes", "Cuenta escalones, ventanas o puertas en lugares que frecuentas. Te sorprenderá lo poco que sabes de sitios que ves a diario."]
 ];
+var factIdx = null;
 function isActiveDay(d){ var l = S.log[d]; return !!(l && (l.w+l.n+l.m+(l.o||0))>0); }
 function practicedDays(){ var n = 0; for(var d in S.log) if(isActiveDay(d)) n++; return n; }
 function sessionNum(){ return practicedDays() + (isActiveDay(todayStr()) ? 0 : 1); }
@@ -674,10 +695,12 @@ function renderHoy(){
   h += '<div class="grid2"><div class="panel"><div class="phase"><h3>Fase actual</h3><h2 style="font-size:1.1rem">'+esc(ph.t)+'</h2><p class="muted small">'+esc(ph.d)+'</p></div></div>'
     + '<div class="panel"><div class="phase" style="border-color:var(--accent)"><h3>Truco del día</h3><h2 style="font-size:1.1rem">'+esc(trick[0])+'</h2><p class="muted small">'+esc(trick[1])+'</p></div></div></div>';
 
-  h += '<p class="small muted" style="padding:0 4px">Basado en Dresler y colaboradores (Neuron, 2017): 30 minutos diarios durante 6 semanas llevaron a principiantes de unas 26 a más de 60 palabras recordadas. <a href="#" data-go="guia" data-anchor="g-fuentes" style="color:var(--accent)">Ver todas las fuentes</a>.</p>';
+  var fi = (factIdx==null ? (Math.abs(daysBetween("2026-01-01", todayStr()))*5)%FACTS.length : factIdx), fact = FACTS[fi];
+  h += '<div class="factline"><p class="small"><span class="sk-t">¿Sabías que?</span> '+esc(fact[0])+'</p><p class="small muted">'+esc(fact[1])+' · <a href="#" id="factNext" style="color:var(--accent)">Otro dato</a> · <a href="#" data-go="guia" data-anchor="g-fuentes" style="color:var(--accent)">Todas las fuentes</a></p></div>';
   h += '</section>';
   view.innerHTML = h;
   wireGuidedPanel();
+  var fn = document.getElementById("factNext"); if(fn) fn.onclick = function(e){ e.preventDefault(); factIdx = (fi+1)%FACTS.length; renderHoy(); var f = view.querySelector(".factline"); if(f) f.scrollIntoView({block:"nearest"}); };
   view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(e){ e.preventDefault(); var a = b.getAttribute("data-anchor"); go(b.getAttribute("data-go")); if(a){ var t = document.getElementById(a); if(t) t.scrollIntoView({block:"start"}); } }; });
 }
 
