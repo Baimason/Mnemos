@@ -1468,13 +1468,23 @@ function startPanel(title, desc, extra){
 }
 
 /* Kim */
+function kimRound(ser){ var K = obs().kim, n = Math.min(4+K.level, 20); Ob = {mode:"kim", phase:"study", items:uniqueItems(n), t0:Date.now(), ser:ser}; renderKim(); }
+function seriesFoot(ser, what, nextId, againId){
+  if(!ser) return '<div class="row"><button class="btn primary" id="'+againId+'">Otra</button>'+obsBack()+'</div>';
+  if(ser.i < ser.N) return '<div class="row"><button class="btn primary" id="'+nextId+'">Siguiente ronda ('+(ser.i+1)+' de '+ser.N+')</button>'+obsBack()+'</div>';
+  return '<div class="phase" style="border-color:var(--accent)"><h3>Serie completa</h3><p><b class="mono">'+ser.hits+' de '+ser.tot+'</b> '+what+(ser.fa ? ', '+ser.fa+' falsa'+(ser.fa>1?'s':'')+' alarma'+(ser.fa>1?'s':'') : ', sin falsas alarmas')+'.</p></div><div class="row"><button class="btn primary" id="'+againId+'">Otra serie</button>'+obsBack()+'</div>';
+}
+function wireSeries(ser, onNext, onAgain){
+  var nx = document.querySelector('[id$="Round"]'); if(nx) nx.onclick = function(){ ser.i++; onNext(ser); };
+  var ag = document.querySelector('#kAgain,#cAgain'); if(ag) ag.onclick = onAgain;
+}
 function renderKim(){
   var K = obs().kim, n = Math.min(4+K.level, 20), secs = Math.max(4, 12-K.level);
   if(Ob.phase==="setup"){
     view.innerHTML = startPanel("Juego de Kim", "Verás <b class=\"mono\">"+n+"</b> figuras durante <b class=\"mono\">"+secs+" s</b>. Después eliges cuáles estaban entre un grupo del doble. Nivel <span class=\"mono\">"+K.level+"</span>.",
       '<p class="small muted">Truco: nómbralas en voz baja o agrúpalas por color. Desde el nivel 4 las figuras falsas se parecen a las reales.</p>');
     wireBack();
-    document.getElementById("obStart").onclick = function(){ Ob = {mode:"kim", phase:"study", items:uniqueItems(n), t0:Date.now()}; renderKim(); };
+    document.getElementById("obStart").onclick = function(){ kimRound({i:1, N:3, hits:0, tot:0, fa:0}); };
     return;
   }
   if(Ob.phase==="study"){
@@ -1498,14 +1508,15 @@ function renderKim(){
       if(res){ cls = "ibtn"+(c.real && Ob.sel[i] ? " hit" : c.real ? " miss" : Ob.sel[i] ? " fa" : " dim"); }
       h += '<button class="'+cls+'" data-k="'+i+'"'+(res?' disabled':'')+'>'+icon(c.it)+'</button>';
     });
-    h += '</div><div class="row">'+(res ? '<button class="btn primary" id="kAgain">Otra</button>' : '<button class="btn primary" id="kGrade">Corregir</button><span class="small muted mono" id="kCount">'+Object.keys(Ob.sel).length+' marcadas</span>')+obsBack()+'</div></div></section>';
+    h += '</div>'+(res ? seriesFoot(Ob.ser, "figuras reconocidas", "kRound", "kAgain") : '<div class="row"><button class="btn primary" id="kGrade">Corregir</button><span class="small muted mono" id="kCount">'+Object.keys(Ob.sel).length+' marcadas</span>'+obsBack()+'</div>')+'</div></section>';
     view.innerHTML = h; wireBack();
-    if(res){ document.getElementById("kAgain").onclick = function(){ Ob = {mode:"kim", phase:"setup"}; renderKim(); }; return; }
+    if(res){ wireSeries(Ob.ser, function(ser){ kimRound(ser); }, function(){ Ob = {mode:"kim", phase:"setup"}; renderKim(); }); return; }
     view.querySelectorAll("[data-k]").forEach(function(b){ b.onclick = function(){ var i=+b.getAttribute("data-k"); if(Ob.sel[i]) delete Ob.sel[i]; else Ob.sel[i]=1; b.classList.toggle("sel"); document.getElementById("kCount").textContent = Object.keys(Ob.sel).length+" marcadas"; }; });
     document.getElementById("kGrade").onclick = function(){
       var hits=0, fa=0; Ob.cands.forEach(function(c,i){ if(Ob.sel[i]){ if(c.real) hits++; else fa++; } });
       var acc = Math.max(0, hits-fa)/Ob.items.length, old = adaptAcc(K, acc, 16);
       K.hist.push({d:todayStr(), ts:Date.now(), n:Ob.items.length, hits:hits, fa:fa, acc:Math.round(acc*1000)/1000, lvl:old});
+      if(Ob.ser){ Ob.ser.hits += hits; Ob.ser.tot += Ob.items.length; Ob.ser.fa += fa; }
       obsDone(); addMinutes(Date.now()-Ob.t0); save();
       Ob.hits = hits; Ob.fa = fa; Ob.old = old; Ob.phase = "result"; renderKim();
     };
@@ -1513,6 +1524,22 @@ function renderKim(){
 }
 
 /* Que cambio */
+function changeRound(ser){
+  var C = obs().change, n = Math.min(14, 5+C.level), k = Math.min(3, 1+Math.floor((C.level-1)/3));
+  var before = []; for(var i=0;i<16;i++) before.push(null);
+      shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0,n).forEach(function(i){ before[i] = randItem(); });
+      var after = before.map(function(x){ return x ? {s:x.s, c:x.c} : null; });
+      var changed = {};
+      shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0,k).forEach(function(i){
+        changed[i] = 1;
+        if(!before[i]){ after[i] = randItem(); return; }
+        var r = Math.random();
+        if(r<0.25) after[i] = null;
+        else if(r<0.62){ var c; do{ c = Math.floor(Math.random()*COLORS.length); } while(c===before[i].c); after[i] = {s:before[i].s, c:c}; }
+        else { var s; do{ s = SHAPES[Math.floor(Math.random()*SHAPES.length)]; } while(s===before[i].s); after[i] = {s:s, c:before[i].c}; }
+      });
+      Ob = {mode:"change", phase:"study", before:before, after:after, changed:changed, k:k, sel:{}, t0:Date.now(), ser:ser}; renderChange();
+}
 function changeGrid(cells, opts){
   opts = opts||{};
   return '<div class="cgrid">'+cells.map(function(it,i){
@@ -1525,21 +1552,7 @@ function renderChange(){
   if(Ob.phase==="setup"){
     view.innerHTML = startPanel("¿Qué cambió?", "Verás una cuadrícula con <b class=\"mono\">"+n+"</b> figuras durante <b class=\"mono\">"+secs+" s</b>. Luego vuelve con <b class=\"mono\">"+k+"</b> cambio"+(k>1?"s":"")+": color, forma, una figura que desapareció o una que apareció. Toca las casillas que cambiaron. Nivel <span class=\"mono\">"+C.level+"</span>.");
     wireBack();
-    document.getElementById("obStart").onclick = function(){
-      var before = []; for(var i=0;i<16;i++) before.push(null);
-      shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0,n).forEach(function(i){ before[i] = randItem(); });
-      var after = before.map(function(x){ return x ? {s:x.s, c:x.c} : null; });
-      var changed = {};
-      shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]).slice(0,k).forEach(function(i){
-        changed[i] = 1;
-        if(!before[i]){ after[i] = randItem(); return; }
-        var r = Math.random();
-        if(r<0.25) after[i] = null;
-        else if(r<0.62){ var c; do{ c = Math.floor(Math.random()*COLORS.length); } while(c===before[i].c); after[i] = {s:before[i].s, c:c}; }
-        else { var s; do{ s = SHAPES[Math.floor(Math.random()*SHAPES.length)]; } while(s===before[i].s); after[i] = {s:s, c:before[i].c}; }
-      });
-      Ob = {mode:"change", phase:"study", before:before, after:after, changed:changed, k:k, sel:{}, t0:Date.now()}; renderChange();
-    };
+    document.getElementById("obStart").onclick = function(){ changeRound({i:1, N:5, hits:0, tot:0, fa:0}); };
     return;
   }
   if(Ob.phase==="study"){
@@ -1561,19 +1574,20 @@ function renderChange(){
     h += '<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>Resultado</h3><div class="big mono">'+Ob.hits+'<span class="muted" style="font-size:1.2rem"> / '+Ob.k+'</span></div></div><p class="muted">'+(Ob.fa?Ob.fa+' falsa'+(Ob.fa>1?'s':'')+' alarma'+(Ob.fa>1?'s':'')+'. ':'')+lvlMsg(Ob.old, C.level)+'</p></div>'
       + '<h3>Antes</h3>'+changeGrid(Ob.before,{mark:mark})+'<h3>Después</h3>'+changeGrid(Ob.after,{mark:mark})
       + '<p class="small muted">Verde: cambio encontrado. Punteado: cambio que no viste. Rojo: marcaste algo que no cambió.</p>'
-      + '<div class="row"><button class="btn primary" id="cAgain">Otra</button>'+obsBack()+'</div>';
+      + seriesFoot(Ob.ser, "cambios encontrados", "cRound", "cAgain");
   } else {
     h += '<h2>Toca lo que cambió</h2><p class="small muted">Hay '+Ob.k+' cambio'+(Ob.k>1?'s':'')+'. Si algo desapareció, toca la casilla vacía.</p>'+changeGrid(Ob.after,{click:true, sel:Ob.sel})
       + '<div class="row"><button class="btn primary" id="cGrade">Listo</button>'+obsBack()+'</div>';
   }
   h += '</div></section>';
   view.innerHTML = h; wireBack();
-  if(res){ document.getElementById("cAgain").onclick = function(){ Ob = {mode:"change", phase:"setup"}; renderChange(); }; return; }
+  if(res){ wireSeries(Ob.ser, function(ser){ changeRound(ser); }, function(){ Ob = {mode:"change", phase:"setup"}; renderChange(); }); return; }
   view.querySelectorAll("[data-c]").forEach(function(b){ b.onclick = function(){ var i=+b.getAttribute("data-c"); if(Ob.sel[i]) delete Ob.sel[i]; else Ob.sel[i]=1; b.classList.toggle("sel"); }; });
   document.getElementById("cGrade").onclick = function(){
     var hits=0, fa=0; for(var i in Ob.sel){ if(Ob.changed[i]) hits++; else fa++; }
     var acc = Math.max(0, hits-fa)/Ob.k, old = adaptAcc(C, acc, 12);
     C.hist.push({d:todayStr(), ts:Date.now(), k:Ob.k, hits:hits, fa:fa, acc:Math.round(acc*1000)/1000, lvl:old});
+    if(Ob.ser){ Ob.ser.hits += hits; Ob.ser.tot += Ob.k; Ob.ser.fa += fa; }
     obsDone(); addMinutes(Date.now()-Ob.t0); save();
     Ob.hits = hits; Ob.fa = fa; Ob.old = old; Ob.phase = "result"; renderChange();
   };
@@ -2505,8 +2519,8 @@ var STEP_INFO = {
   palabras:{t:"Palabras en el palacio", g:"Memoria", n:1, min:5},
   numeros:{t:"Números", g:"Memoria", n:1, min:5},
   mayor:{t:"Repaso del sistema mayor", g:"Memoria", n:20, min:5},
-  kim:{t:"Juego de Kim", g:"Observación", n:1, min:2},
-  change:{t:"¿Qué cambió?", g:"Observación", n:1, min:2},
+  kim:{t:"Juego de Kim", g:"Observación", n:3, min:4},
+  change:{t:"¿Qué cambió?", g:"Observación", n:5, min:4},
   flash:{t:"Conteo flash", g:"Estimación", n:3, min:2},
   eye:{t:"Ojo métrico", g:"Estimación", n:3, min:2},
   clock:{t:"Reloj interno", g:"Estimación", n:3, min:3},
@@ -2599,6 +2613,10 @@ function guidedBar(){
     + '<div class="meter" style="margin-top:6px"><i style="width:'+((g.idx + Math.min(1, have/st.n))/g.steps.length*100).toFixed(0)+'%"></i></div></div>'
     + '<div class="row" style="flex-wrap:nowrap">'+(ready ? '<button class="btn small primary" id="gNext">'+(last?'Terminar':'Siguiente')+'</button>' : '<button class="btn small ghost" id="gSkip">Saltar</button>')+'<button class="btn small ghost" id="gPause">Pausar</button></div>';
   sec.insertBefore(bar, sec.firstChild);
+  ["obBack","qBackBtn","kMenu","rMenu","tMenu","home","nHome","qQuit","fSkip"].forEach(function(id){ var e = document.getElementById(id); if(e) e.style.display = "none"; });
+  var REP = ["kAgain","cAgain","flAgain","eAgain","fNext","clkAgain","dAgain","rNext","tNext","kNext","qAgain","again","nAgain","qEnd"], found = false;
+  if(ready) REP.forEach(function(id){ var e = document.getElementById(id); if(e){ found = true; e.textContent = last ? "Terminar entrenamiento" : "Siguiente ejercicio"; e.onclick = function(ev){ ev.preventDefault(); nextStep(); }; } });
+  var gn0 = document.getElementById("gNext"); if(gn0 && found) gn0.style.display = "none";
   var n = document.getElementById("gNext"); if(n) n.onclick = nextStep;
   var s = document.getElementById("gSkip"); if(s) s.onclick = nextStep;
   document.getElementById("gPause").onclick = function(){ go("hoy"); };
