@@ -184,6 +184,19 @@ div.ccell{cursor:default}
 .refs li{line-height:1.5}
 @media (max-width:640px){ .skills{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2{grid-template-columns:1fr} }
 @media (max-width:420px){ .hero{flex-direction:column-reverse;align-items:flex-start} }
+/* Guiado */
+.gpanel h2{font-size:1.2rem}
+.gsteps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;counter-reset:gs}
+.gsteps li{counter-increment:gs;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;font-size:.88rem;position:relative}
+.gsteps li::after{content:counter(gs);position:absolute;top:6px;right:9px;font:600 .72rem var(--f-mono);color:var(--muted)}
+.gsteps li.done{border-color:var(--ok)}
+.gsteps li.done::after{content:"✓";color:var(--ok)}
+.gsteps li.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.gbar{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;border-color:var(--accent);padding:12px 14px}
+.gbar>div:first-child{flex:1}
+details.goals summary{cursor:pointer;list-style:none}
+details.goals summary::-webkit-details-marker{display:none}
+details.goals[open] summary{margin-bottom:8px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -396,6 +409,8 @@ function renderGuia(){
     + '<li>Ekman, P. (2003). <i>Emotions Revealed</i>. Times Books.</li>'
     + '<li>Forer, B. R. (1949). The fallacy of personal validation: a classroom demonstration of gullibility. <i>Journal of Abnormal and Social Psychology</i>, 44(1), 118 a 123.</li>'
     + '<li>Kahneman, D. (2011). <i>Thinking, Fast and Slow</i>. Farrar, Straus and Giroux.</li>'
+    + '<li>Owen, A. M., Hampshire, A., Grahn, J. A. y otros (2010). Putting brain training to the test. <i>Nature</i>, 465, 775 a 778.</li>'
+    + '<li>Simons, D. J., Boot, W. R., Charness, N. y otros (2016). Do "brain-training" programs work? <i>Psychological Science in the Public Interest</i>, 17(3), 103 a 186.</li>'
     + '<li>U.S. Government Accountability Office (2013). <i>Aviation Security: TSA Should Limit Future Funding for Behavior Detection Activities</i> (GAO 14 159).</li></ul>'
     + '<h3>Estimación y calibración</h3><ul class="refs">'
     + '<li>Tetlock, P. E. y Gardner, D. (2015). <i>Superforecasting: The Art and Science of Prediction</i>. Crown.</li>'
@@ -429,6 +444,7 @@ function mergeState(a, b){
   var out = JSON.parse(JSON.stringify(a));
   if(b.start && b.start < out.start) out.start = b.start;
   out.seenGuide = !!(a.seenGuide || b.seenGuide);
+  if(!out.guided && b.guided) out.guided = b.guided;
   b.palaces.forEach(function(pb){
     var i = -1; out.palaces.forEach(function(pa,k){ if(pa.id===pb.id) i=k; });
     if(i<0) out.palaces.push(pb);
@@ -607,14 +623,15 @@ function renderHoy(){
     + '<div class="kpis"><div><b class="mono">'+st+'</b><span>'+(st===1?'día de racha':'días de racha')+'</span></div><div><b class="mono">'+pd+'</b><span>días practicados</span></div><div><b class="mono">'+(totalMin>=120 ? (totalMin/60).toFixed(1)+' h' : Math.round(totalMin)+' min')+'</b><span>en total</span></div></div></div>'
     + '<div class="hero-r">'+ring(l.min, 30)+'</div></div>';
 
-  h += '<div class="panel"><h3>Sesión de hoy</h3><div class="blocks">';
+  h += guidedPanel();
+  h += '<details class="panel goals"'+(guided()?'':' open')+'><summary><h3 style="display:inline">Metas del día</h3> <span class="small muted mono">'+doneN+' de '+reqN+'</span></summary><div class="blocks">';
   blocks.forEach(function(b){
     h += '<div class="block"><div class="check'+(b.done?' done':'')+'"></div><div><div style="font-weight:600">'+esc(b.t)+'</div><div class="muted small">'+esc(b.d)+(b.prog?' · <span class="mono">'+b.prog+'</span>':'')+'</div></div>'
       + '<button class="btn small'+(b.locked?' ghost':'')+'" data-go="'+b.tab+'">'+(b.locked?'Adelantar':'Ir')+'</button></div>';
   });
   h += '</div>';
-  if(reqDone && l.min<30) h += '<p class="small muted">Puedes cerrar aquí y el día cuenta. Si te sobran unos '+Math.max(1,Math.round(30-l.min))+' minutos, rinde más otra ronda de palabras, un repaso del palacio con los ojos cerrados o un par de ejercicios del Observador.</p>';
-  h += '</div>';
+  h += '<p class="small muted">El entrenamiento guiado ya cubre estas metas. Úsalas si prefieres ir por tu cuenta.</p>';
+  h += '</details>';
 
   h += '<div class="grid2"><div class="panel"><h3>Mapa de práctica</h3>'+heatmap()+'<p class="small muted">Últimas 12 semanas, de lunes a domingo. Más intenso cuanto más cerca de los 30 minutos.</p></div>'
     + '<div class="panel"><h3>Minutos por día</h3>'+minutesChart()+'</div></div>';
@@ -635,6 +652,7 @@ function renderHoy(){
   h += '<p class="small muted" style="padding:0 4px">Basado en Dresler y colaboradores (Neuron, 2017): 30 minutos diarios durante 6 semanas llevaron a principiantes de unas 26 a más de 60 palabras recordadas. <a href="#" data-go="guia" data-anchor="g-fuentes" style="color:var(--accent)">Ver todas las fuentes</a>.</p>';
   h += '</section>';
   view.innerHTML = h;
+  wireGuidedPanel();
   view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(e){ e.preventDefault(); var a = b.getAttribute("data-anchor"); go(b.getAttribute("data-go")); if(a){ var t = document.getElementById(a); if(t) t.scrollIntoView({block:"start"}); } }; });
 }
 
@@ -1100,7 +1118,8 @@ function renderObs(){
   h += '<div class="panel"><h2>Observador</h2><p class="muted">Entrena observar, estimar y razonar con números. La regla es siempre la misma: <b>estima, anota, verifica</b>. Sin comparar contra el valor real no hay mejora, solo confianza.</p>'
     + '<p class="small muted">Hoy llevas <b class="mono">'+(l.o||0)+'</b> ejercicio'+((l.o||0)===1?'':'s')+'. '
     + (wd===6 ? 'Los sábados toca el ejercicio que peor te vaya.' : wd===0 ? 'Los domingos son de descanso: revisa tus gráficas en Progreso.' : 'Sugeridos para hoy: '+sug.map(function(k){ return OBS_LIST.filter(function(o){ return o[0]===k; })[0][1]; }).join(" y ")+'.')+'</p></div>';
-  h += '<div class="panel"><div class="blocks">';
+  h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>¿No sabes cuál hacer?</h3><p class="small muted">El entrenamiento de hoy elige y ordena los ejercicios por ti.</p></div><button class="btn primary small" data-go="hoy">Ir al entrenamiento</button></div></div>';
+  h += '<div class="panel"><h3>Práctica libre</h3><div class="blocks">';
   OBS_LIST.forEach(function(o){
     var on = sug.indexOf(o[0])>=0;
     h += '<div class="block"><div class="check'+(on?' sug':'')+'"></div><div><div style="font-weight:600">'+esc(o[1])+(on?' <span class="badge">hoy</span>':'')+'</div><div class="muted small">'+esc(o[2])+'</div><div class="small mono" style="color:var(--brass)">'+esc(obsMeta(o[0]))+'</div></div><button class="btn small" data-om="'+o[0]+'">Ir</button></div>';
@@ -1110,6 +1129,7 @@ function renderObs(){
   h += '</section>';
   view.innerHTML = h;
   view.querySelectorAll("[data-om]").forEach(function(b){ b.onclick = function(){ Ob = {mode:b.getAttribute("data-om"), phase:"setup"}; renderObs(); }; });
+  view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
 }
 function obsBack(){ return '<button class="btn small ghost" id="obBack">Volver a Observador</button>'; }
 function wireBack(){ var b = document.getElementById("obBack"); if(b) b.onclick = function(){ stopTimer(); Ob = {mode:"menu"}; renderObs(); }; }
@@ -2035,6 +2055,108 @@ function renderProgreso(){
   view.innerHTML = h;
   view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
 }
+
+/* ---------- ENTRENAMIENTO GUIADO ---------- */
+var STEP_INFO = {
+  calc:{t:"Cálculo mental", g:"Calentamiento", n:5, min:2},
+  palabras:{t:"Palabras en el palacio", g:"Memoria", n:1, min:5},
+  numeros:{t:"Números", g:"Memoria", n:1, min:5},
+  mayor:{t:"Repaso del sistema mayor", g:"Memoria", n:20, min:5},
+  kim:{t:"Juego de Kim", g:"Observación", n:1, min:2},
+  change:{t:"¿Qué cambió?", g:"Observación", n:1, min:2},
+  flash:{t:"Conteo flash", g:"Estimación", n:3, min:2},
+  eye:{t:"Ojo métrico", g:"Estimación", n:3, min:2},
+  clock:{t:"Reloj interno", g:"Estimación", n:3, min:3},
+  fermi:{t:"Estimación Fermi", g:"Razonamiento", n:2, min:4},
+  dow:{t:"Día de la semana", g:"Razonamiento", n:3, min:3},
+  tf:{t:"Verdadero o falso", g:"Calibración", n:4, min:2}
+};
+function stepCount(k){
+  var O = obs();
+  if(k==="palabras") return S.words.hist.length;
+  if(k==="numeros") return S.nums.hist.length;
+  if(k==="mayor") return dayLog().m;
+  if(k==="tf") return O.calib.hist.filter(function(h){ return h.t==="tf"; }).length;
+  return O[k].hist.length;
+}
+function buildPlan(){
+  var w = weekNum(), seed = Math.abs(daysBetween("2026-01-01", todayStr())), obsA = seed%2 ? "kim" : "change", obsB = seed%2 ? "change" : "kim";
+  var est = ["flash","eye","clock","fermi"][seed%4], steps = ["calc","palabras",obsA,est];
+  var due = dueList().length;
+  if(w>=2 && majorFilled()>=10 && due) steps.push("mayor"); else steps.push("dow");
+  steps.push(w>=3 ? "numeros" : obsB);
+  steps.push("palabras");
+  steps.push(steps.indexOf("dow")>=0 || seed%3 ? "tf" : "dow");
+  return steps.map(function(k){ return {k:k, n:k==="mayor" ? Math.min(20, due) : STEP_INFO[k].n}; });
+}
+function guided(){ var g = S.guided; return g && g.date===todayStr() ? g : null; }
+function guidedActive(){ var g = guided(); return g && !g.done && g.idx < g.steps.length; }
+function startGuided(){ S.guided = {date:todayStr(), steps:buildPlan(), idx:0, done:false}; startStep(0); }
+function startStep(i){
+  var g = guided(); g.idx = i; var st = g.steps[i]; st.base = stepCount(st.k); st.ts0 = Date.now(); save();
+  var k = st.k;
+  if(k==="palabras"){ W = {phase:"setup"}; go("palabras"); return; }
+  if(k==="numeros"){ Nm = {phase:"setup"}; go("numeros"); return; }
+  if(k==="mayor"){ Q = null; go("mayor"); var qs = document.getElementById("qStart"); if(qs && !qs.disabled) qs.click(); return; }
+  if(k==="tf"){ Ob = {mode:"calib", phase:"setup"}; go("obs"); var t = document.getElementById("cbT"); if(t) t.click(); return; }
+  Ob = {mode:k, phase:"setup"}; go("obs");
+  if(k==="calc"){ var c = document.getElementById("obStart"); if(c) c.click(); }
+}
+function nextStep(){
+  var g = guided(); if(!g) return;
+  g.steps[g.idx].ts1 = Date.now();
+  if(g.idx+1 >= g.steps.length){ g.done = true; g.idx = g.steps.length; save(); Ob = {mode:"menu"}; go("hoy"); return; }
+  startStep(g.idx+1);
+}
+function stepResult(st){
+  var O = obs(), t0 = st.ts0||0, t1 = st.ts1||Infinity;
+  function inR(h){ return h.ts>=t0 && h.ts<=t1; }
+  var k = st.k, H;
+  if(k==="calc"){ H = O.calc.hist.filter(inR); return H.length ? H.filter(function(h){ return h.ok; }).length+" de "+H.length+" correctas" : "omitido"; }
+  if(k==="palabras" || k==="numeros"){ H = (k==="palabras"?S.words:S.nums).hist.filter(inR); return H.length ? H.map(function(h){ return h.ok+" de "+h.n; }).join(", ") : "omitido"; }
+  if(k==="mayor"){ var n = stepCount("mayor") - (st.base||0); return n>0 ? n+" tarjetas" : "omitido"; }
+  if(k==="kim" || k==="change"){ H = O[k].hist.filter(inR); return H.length ? Math.round(avg(H.map(function(h){ return h.acc*100; })))+"% de precisión" : "omitido"; }
+  if(k==="flash" || k==="clock"){ H = O[k].hist.filter(inR); return H.length ? "error medio "+Math.round(avg(H.map(function(h){ return h.err; })))+"%" : "omitido"; }
+  if(k==="eye"){ H = O.eye.hist.filter(inR); return H.length ? "error medio "+Math.round(avg(H.map(function(h){ return h.err; }))) : "omitido"; }
+  if(k==="fermi"){ H = O.fermi.hist.filter(inR); return H.length ? "error log "+avg(H.map(function(h){ return h.err; })).toFixed(2) : "omitido"; }
+  if(k==="dow"){ H = O.dow.hist.filter(inR); return H.length ? H.filter(function(h){ return h.ok; }).length+" de "+H.length+" · "+avg(H.map(function(h){ return h.secs; })).toFixed(0)+" s promedio" : "omitido"; }
+  if(k==="tf"){ H = O.calib.hist.filter(function(h){ return h.t==="tf" && inR(h); }); return H.length ? H.filter(function(h){ return h.ok; }).length+" de "+H.length+" correctas" : "omitido"; }
+  return "";
+}
+function guidedPanel(){
+  var g = guided(), plan = g ? g.steps : buildPlan(), mins = plan.reduce(function(s,x){ return s + STEP_INFO[x.k].min; }, 0);
+  var list = function(cur){ return '<ol class="gsteps">'+plan.map(function(st,i){ var I = STEP_INFO[st.k], cls = g && (i<g.idx || g.done) ? "done" : (cur && g && i===g.idx ? "cur" : ""); return '<li class="'+cls+'"><span class="sk-t">'+esc(I.g)+'</span><span>'+esc(I.t)+'</span>'+(g && g.done ? '<span class="mono small muted">'+esc(stepResult(st))+'</span>' : '')+'</li>'; }).join("")+'</ol>'; };
+  if(g && g.done){
+    return '<div class="panel gpanel"><h3>Entrenamiento de hoy</h3><h2>Completado</h2><p class="muted small">Resumen de lo que hiciste hoy. Mañana la combinación cambia.</p>'+list(false)
+      + '<div class="row"><button class="btn small" data-go="obs">Práctica libre</button><button class="btn small ghost" id="gAgain">Repetir el entrenamiento</button></div></div>';
+  }
+  if(g){
+    var cur = STEP_INFO[g.steps[g.idx].k];
+    return '<div class="panel gpanel"><h3>Entrenamiento de hoy · paso '+(g.idx+1)+' de '+g.steps.length+'</h3><h2>'+esc(cur.t)+'</h2>'+list(true)
+      + '<div class="row"><button class="btn primary" id="gGo">Continuar</button></div></div>';
+  }
+  return '<div class="panel gpanel"><h3>Entrenamiento de hoy</h3><h2>'+plan.length+' ejercicios cortos · unos '+mins+' min</h2><p class="muted small">Una secuencia que alterna memoria, observación, estimación y razonamiento. Solo sigue los pasos; cambia cada día.</p>'+list(false)
+    + '<div class="row"><button class="btn primary" id="gGo">Empezar</button></div></div>';
+}
+function wireGuidedPanel(){
+  var b = document.getElementById("gGo"); if(b) b.onclick = function(){ if(guided()) startStep(guided().idx); else startGuided(); };
+  var a = document.getElementById("gAgain"); if(a) a.onclick = function(){ startGuided(); };
+}
+function guidedBar(){
+  if(!guidedActive() || ["hoy","guia","progreso","sync","palacio"].indexOf(current)>=0) return;
+  var sec = view.querySelector("section.view"); if(!sec || sec.querySelector("#gbar")) return;
+  var g = guided(), st = g.steps[g.idx], I = STEP_INFO[st.k], have = Math.max(0, stepCount(st.k) - (st.base||0)), ready = have >= st.n, last = g.idx === g.steps.length-1;
+  var bar = document.createElement("div");
+  bar.className = "panel gbar"; bar.id = "gbar";
+  bar.innerHTML = '<div style="min-width:0"><h3>Entrenamiento · paso '+(g.idx+1)+' de '+g.steps.length+'</h3><div class="small"><b>'+esc(I.t)+'</b> · <span class="mono">'+Math.min(have, st.n)+' de '+st.n+'</span></div>'
+    + '<div class="meter" style="margin-top:6px"><i style="width:'+((g.idx + Math.min(1, have/st.n))/g.steps.length*100).toFixed(0)+'%"></i></div></div>'
+    + '<div class="row" style="flex-wrap:nowrap">'+(ready ? '<button class="btn small primary" id="gNext">'+(last?'Terminar':'Siguiente')+'</button>' : '<button class="btn small ghost" id="gSkip">Saltar</button>')+'<button class="btn small ghost" id="gPause">Pausar</button></div>';
+  sec.insertBefore(bar, sec.firstChild);
+  var n = document.getElementById("gNext"); if(n) n.onclick = nextStep;
+  var s = document.getElementById("gSkip"); if(s) s.onclick = nextStep;
+  document.getElementById("gPause").onclick = function(){ go("hoy"); };
+}
+new MutationObserver(function(){ guidedBar(); }).observe(view, {childList:true});
 
 /* ---------- boot ---------- */
 var startTab = "hoy";
