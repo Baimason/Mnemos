@@ -162,6 +162,28 @@ div.ccell{cursor:default}
 .check.sug{border-color:var(--accent)}
 .lesson summary{cursor:pointer;font-weight:600;padding:6px 0}
 .lesson .prose{padding-top:6px}
+/* Hoy */
+.hero{flex-direction:row;align-items:center;justify-content:space-between;gap:16px}
+.hero-l{display:flex;flex-direction:column;gap:6px;min-width:0}
+.caseno{font-family:var(--f-mono);font-size:.78rem;color:var(--brass);letter-spacing:.06em;text-transform:uppercase}
+.kpis{display:flex;gap:22px;flex-wrap:wrap;margin-top:6px}
+.kpis div{display:flex;flex-direction:column}
+.kpis b{font-family:var(--f-display);font-size:1.5rem;font-weight:750;line-height:1.1}
+.kpis span{font-size:.78rem;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.skills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.skill{appearance:none;text-align:left;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0}
+.skill:hover{border-color:var(--accent)}
+.skill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sk-t{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.skill b{font-family:var(--f-display);font-size:1.6rem;font-weight:750;line-height:1.1}
+.sk-s{font-size:.78rem;color:var(--muted);min-height:2.4em}
+.ok.small,.bad.small{font-size:.78rem}
+.ok{color:var(--ok)} .bad{color:var(--bad)}
+.refs{font-size:.88rem}
+.refs li{line-height:1.5}
+@media (max-width:640px){ .skills{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2{grid-template-columns:1fr} }
+@media (max-width:420px){ .hero{flex-direction:column-reverse;align-items:flex-start} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -252,7 +274,8 @@ function levelFor(ok, n, old){ var acc = ok/n; return acc>=0.9 ? old+2 : acc<0.6
 function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function palace(){ for(var i=0;i<S.palaces.length;i++) if(S.palaces[i].id===S.active) return S.palaces[i]; S.active=S.palaces[0].id; return S.palaces[0]; }
 function loci(){ return palace().loci.filter(function(x){ return norm(x); }); }
-function weekNum(){ return Math.floor(Math.max(0,daysBetween(S.start, todayStr()))/7)+1; }
+function weekNum(){ return Math.floor((sessionNum()-1)/7)+1; }
+function pad3(i){ return (i<10?"00":i<100?"0":"")+i; }
 function phase(){ var w=weekNum(), p=PHASES[0]; for(var i=0;i<PHASES.length;i++) if(w>=PHASES[i].w) p=PHASES[i]; return p; }
 function streak(){
   var d = todayStr(), n = 0;
@@ -270,7 +293,7 @@ var timerId = null;
 function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
 
 function header(){
-  document.getElementById("hdrday").textContent = "Día " + (daysBetween(S.start,todayStr())+1) + " · semana " + weekNum();
+  document.getElementById("hdrday").textContent = "Sesión " + sessionNum() + " · semana " + weekNum();
 }
 
 function go(tab){
@@ -296,7 +319,7 @@ function renderGuia(){
   var walk = ex.map(function(e,i){ return '<div><span class="pin">'+pad2(i+1)+'</span><b>'+esc(L[i]||EXAMPLE_LOCI[i])+'</b><span>'+esc(e[1])+'</span></div>'; }).join("");
   var h = '<section class="view">';
   h += '<div class="panel"><div class="prose"><h2>Cómo funciona todo esto</h2><p class="muted">Una lectura de unos 5 minutos. Explica qué es la técnica, por qué funciona y qué vas a hacer cada día.</p>'
-    + '<nav class="toc"><a href="#g-que">Qué es</a><a href="#g-origen">De dónde viene</a><a href="#g-porque">Por qué funciona</a><a href="#g-como">Cómo se usa</a><a href="#g-imagenes">Buenas imágenes</a><a href="#g-numeros">Números</a><a href="#g-app">Esta app</a><a href="#g-dudas">Dudas comunes</a></nav></div></div>';
+    + '<nav class="toc"><a href="#g-que">Qué es</a><a href="#g-origen">De dónde viene</a><a href="#g-porque">Por qué funciona</a><a href="#g-como">Cómo se usa</a><a href="#g-imagenes">Buenas imágenes</a><a href="#g-numeros">Números</a><a href="#g-app">Esta app</a><a href="#g-dudas">Dudas comunes</a><a href="#g-fuentes">Fuentes</a></nav></div></div>';
 
   h += '<div class="panel" id="g-que"><div class="prose"><h3>Qué es</h3><h2>Un palacio de la memoria es un lugar que ya conoces, usado como estantería</h2>'
     + '<p>La idea es simple. Tomas un sitio que conoces de memoria, como tu casa, y fijas un recorrido por él: la puerta, luego la alfombra, luego el sofá, y así. Cada punto del recorrido es un <b>lugar</b> (en latín, <i>locus</i>; por eso también se llama método de loci).</p>'
@@ -345,7 +368,7 @@ function renderGuia(){
     + '<li><b>Números:</b> lo mismo con dígitos, usando tu tabla del sistema mayor.</li>'
     + '<li><b>Sistema mayor:</b> donde llenas tu tabla del 00 al 99 y la repasas con tarjetas.</li>'
     + '<li><b>Progreso:</b> tus gráficas y récords.</li></ul>'
-    + '<p>La dificultad se ajusta sola: si aciertas el 90% o más subes de nivel, y si bajas del 60% retrocedes un poco para consolidar. El plan dura 6 semanas, igual que el estudio de Dresler: palabras primero, luego la tabla, luego números y al final velocidad.</p></div></div>';
+    + '<p>La dificultad se ajusta sola: si aciertas el 90% o más subes de nivel, y si bajas del 60% retrocedes un poco para consolidar. El plan dura 6 semanas de práctica (solo cuentan los días que entrenas), igual que el estudio de Dresler: palabras primero, luego la tabla, luego números y al final velocidad.</p></div></div>';
 
   h += '<div class="panel" id="g-dudas"><div class="prose"><h3>Dudas comunes</h3>'
     + '<div class="qa"><b>¿Si reuso el palacio, no se mezclan las listas?</b><p>Un poco, al principio. Las imágenes viejas se desvanecen en uno o dos días. Si te molesta, alterna entre dos palacios.</p></div>'
@@ -353,6 +376,39 @@ function renderGuia(){
     + '<div class="qa"><b>¿Esto mejora mi memoria en general?</b><p>No exactamente. Te vuelve muy bueno usando este método. La ganancia real viene cuando lo aplicas a cosas tuyas: listas, presentaciones, vocabulario de idiomas, contraseñas, pasos de un proceso.</p></div>'
     + '<div class="qa"><b>¿Y si un día no puedo entrenar?</b><p>No pasa nada. La racha se corta, pero el método no se pierde. Volver al día siguiente importa más que no fallar nunca.</p></div>'
     + '</div><div class="row"><button class="btn primary" data-go="palacio">Armar mi palacio</button><button class="btn" data-go="hoy">Volver a Hoy</button></div></div>';
+  h += '<div class="panel" id="g-fuentes"><div class="prose"><h3>Fuentes</h3><h2>Bibliografía</h2>'
+    + '<p class="muted">Todo lo que se usó para construir Mnemos, agrupado por tema. Los datos de las preguntas de Fermi, calibración y verdadero o falso son valores de referencia ampliamente publicados y están redondeados; sirven para estimar, no como cifra exacta.</p>'
+    + '<h3>Memoria y método de loci</h3><ul class="refs">'
+    + '<li>Dresler, M., Shirer, W. R., Konrad, B. N. y otros (2017). Mnemonic training reshapes brain networks to support superior memory. <i>Neuron</i>, 93(5), 1227 a 1235.</li>'
+    + '<li>Maguire, E. A., Valentine, E. R., Wilding, J. M. y Kapur, N. (2003). Routes to remembering: the brains behind superior memory. <i>Nature Neuroscience</i>, 6(1), 90 a 95.</li>'
+    + '<li>Yates, F. A. (1966). <i>The Art of Memory</i>. Routledge and Kegan Paul.</li>'
+    + '<li>Cicerón. <i>De oratore</i>, libro II (relato de Simónides de Ceos).</li>'
+    + '<li>Quintiliano. <i>Institutio oratoria</i>, libro XI.</li>'
+    + '<li>Foer, J. (2011). <i>Moonwalking with Einstein</i>. Penguin Press.</li></ul>'
+    + '<h3>Observación y lectura de personas</h3><ul class="refs">'
+    + '<li>Konnikova, M. (2013). <i>Mastermind: How to Think Like Sherlock Holmes</i>. Viking.</li>'
+    + '<li>Gosling, S. (2008). <i>Snoop: What Your Stuff Says About You</i>. Basic Books.</li>'
+    + '<li>Gosling, S. D., Ko, S. J., Mannarelli, T. y Morris, M. E. (2002). A room with a cue: personality judgments based on offices and bedrooms. <i>Journal of Personality and Social Psychology</i>, 82(3), 379 a 398.</li>'
+    + '<li>Rentfrow, P. J. y Gosling, S. D. (2003). The do re mi\'s of everyday life: the structure and personality correlates of music preferences. <i>Journal of Personality and Social Psychology</i>, 84(6), 1236 a 1256.</li>'
+    + '<li>Ambady, N. y Rosenthal, R. (1993). Half a minute: predicting teacher evaluations from thin slices of nonverbal behavior and physical attractiveness. <i>Journal of Personality and Social Psychology</i>, 64(3), 431 a 441.</li>'
+    + '<li>Bond, C. F. y DePaulo, B. M. (2006). Accuracy of deception judgments. <i>Personality and Social Psychology Review</i>, 10(3), 214 a 234.</li>'
+    + '<li>Ickes, W. (Ed.) (1997). <i>Empathic Accuracy</i>. Guilford Press.</li>'
+    + '<li>Ekman, P. (2003). <i>Emotions Revealed</i>. Times Books.</li>'
+    + '<li>Forer, B. R. (1949). The fallacy of personal validation: a classroom demonstration of gullibility. <i>Journal of Abnormal and Social Psychology</i>, 44(1), 118 a 123.</li>'
+    + '<li>Kahneman, D. (2011). <i>Thinking, Fast and Slow</i>. Farrar, Straus and Giroux.</li>'
+    + '<li>U.S. Government Accountability Office (2013). <i>Aviation Security: TSA Should Limit Future Funding for Behavior Detection Activities</i> (GAO 14 159).</li></ul>'
+    + '<h3>Estimación y calibración</h3><ul class="refs">'
+    + '<li>Tetlock, P. E. y Gardner, D. (2015). <i>Superforecasting: The Art and Science of Prediction</i>. Crown.</li>'
+    + '<li>Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. <i>Monthly Weather Review</i>, 78(1), 1 a 3.</li>'
+    + '<li>Lichtenstein, S., Fischhoff, B. y Phillips, L. D. (1982). Calibration of probabilities: the state of the art to 1980. En Kahneman, Slovic y Tversky (Eds.), <i>Judgment under Uncertainty</i>. Cambridge University Press.</li>'
+    + '<li>Weinstein, L. y Adam, J. A. (2008). <i>Guesstimation</i>. Princeton University Press.</li></ul>'
+    + '<h3>Ejercicios y técnicas</h3><ul class="refs">'
+    + '<li>Conway, J. H. (1973). Tomorrow is the day after Doomsday. <i>Eureka</i>, 36, 28 a 31.</li>'
+    + '<li>Berlekamp, E., Conway, J. H. y Guy, R. (1982). <i>Winning Ways for Your Mathematical Plays</i>. Academic Press.</li>'
+    + '<li>Kipling, R. (1901). <i>Kim</i>. Macmillan (origen del juego de Kim).</li>'
+    + '<li>Baden-Powell, R. (1908). <i>Scouting for Boys</i>. Horace Cox.</li>'
+    + '<li>Cooper, J. (1972). <i>Principles of Personal Defense</i>. Paladin Press (código de colores).</li></ul>'
+    + '</div></div>';
   h += '</section>';
   view.innerHTML = h;
   view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
@@ -452,51 +508,134 @@ function renderSync(){
 }
 
 /* ---------- HOY ---------- */
+var TRICKS = [
+  ["Grados con la mano", "Con el brazo estirado: meñique ≈ 1°, tres dedos ≈ 5°, puño ≈ 10°, palmo abierto ≈ 20°. Mide los tuyos una vez."],
+  ["Distancia por tamaño conocido", "Distancia ≈ tamaño del objeto × 57 ÷ grados que ocupa. Una persona de 1,7 m que cabe detrás del meñique está a unos 100 m."],
+  ["Salto del pulgar", "Alinea el pulgar con un objeto y cambia de ojo. Lo que se desplaza en la escena, multiplicado por 10, es la distancia aproximada."],
+  ["Luz restante", "Dedos horizontales entre el sol y el horizonte: cada dedo son unos 15 minutos antes de la puesta."],
+  ["Distancia de un rayo", "Cuenta los segundos entre el relámpago y el trueno y divide entre 3: son kilómetros."],
+  ["Norte con una sombra", "Marca la punta de la sombra de un palo, espera 15 minutos y marca otra vez. De la primera marca a la segunda apunta hacia el este."],
+  ["Mira hacia atrás", "En un lugar nuevo voltea de vez en cuando. La ruta de regreso se ve distinta y así la reconoces después."],
+  ["Direcciones por reloj", "\"A tus 3\" es a la derecha, \"a tus 12\" al frente. Es rápido y no depende de quién escucha."],
+  ["Batería alcalina", "Déjala caer de pie desde 5 a 10 cm. Si rebota y se cae, probablemente está gastada. Es una pista, no una medición."],
+  ["Control remoto", "Apúntalo a la cámara del celular y presiona un botón. Si ves una luz parpadear, el control emite."],
+  ["Huevo en agua", "Si se hunde acostado está fresco, si se para es más viejo, si flota descártalo."],
+  ["Lado del tanque", "La flecha junto al icono del surtidor en el tablero indica de qué lado está la tapa de gasolina."],
+  ["Meses con los nudillos", "Cuenta los meses sobre nudillos y huecos del puño: los que caen en nudillo tienen 31 días."],
+  ["Señal de intrusión", "Un cabello o hilo delgado entre puerta y marco te dice si alguien la abrió."],
+  ["Lentes ocultos", "Recorre un cuarto con la linterna del celular buscando reflejos pequeños y fijos."],
+  ["Regla del 72", "72 ÷ tasa de interés anual = años para duplicar el dinero. Al 6%, unos 12 años."],
+  ["Porcentajes invertidos", "x% de y es igual a y% de x. El 8% de 50 es el 50% de 8: 4."],
+  ["Código de colores de Cooper", "Blanco distraído, amarillo atento, naranja algo llamó tu atención, rojo actúas. La idea es vivir en amarillo, no en paranoia."],
+  ["Reporte SALUTE", "Para describir lo que viste: cuántos, qué hacían, dónde, cómo vestían, cuándo y qué llevaban."],
+  ["Describir personas", "De lo permanente a lo cambiable: estatura, complexión, cara, marcas, y al final la ropa, que se cambia en segundos."],
+  ["Contar multitudes", "Divide el grupo en una cuadrícula mental, cuenta una celda y multiplica por el número de celdas."],
+  ["Comportamiento base", "Antes de interpretar a alguien, fíjate cómo actúa normalmente. Importan los cambios respecto a esa base, no los gestos sueltos."],
+  ["Escaleras de Holmes", "Cuenta escalones, ventanas o puertas en lugares que frecuentas. Te sorprenderá lo poco que sabes de sitios que ves a diario."]
+];
+function isActiveDay(d){ var l = S.log[d]; return !!(l && (l.w+l.n+l.m+(l.o||0))>0); }
+function practicedDays(){ var n = 0; for(var d in S.log) if(isActiveDay(d)) n++; return n; }
+function sessionNum(){ return practicedDays() + (isActiveDay(todayStr()) ? 0 : 1); }
+function greeting(){ var h = new Date().getHours(); return h<12 ? "Buenos días" : h<19 ? "Buenas tardes" : "Buenas noches"; }
+function longDate(){ var d = new Date(); return DAYS[d.getDay()]+" "+d.getDate()+" de "+MONTHS[d.getMonth()]; }
+function ring(min, goal){
+  var r = 34, c = 2*Math.PI*r, p = Math.min(1, min/goal);
+  return '<svg viewBox="0 0 84 84" width="96" height="96" role="img" aria-label="'+Math.round(min)+' de '+goal+' minutos">'
+    + '<circle cx="42" cy="42" r="'+r+'" fill="none" stroke="var(--soft)" stroke-width="8"/>'
+    + (p>0 ? '<circle cx="42" cy="42" r="'+r+'" fill="none" stroke="'+(p>=1?'var(--ok)':'var(--accent)')+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+(c*p).toFixed(1)+' '+c.toFixed(1)+'" transform="rotate(-90 42 42)"/>' : '')
+    + '<text x="42" y="42" text-anchor="middle" style="font:700 19px var(--f-display);fill:var(--ink)">'+Math.round(min)+'</text>'
+    + '<text x="42" y="56" text-anchor="middle" style="font-size:9px">de '+goal+' min</text></svg>';
+}
+function heatmap(){
+  var weeks = 12, cell = 13, gap = 3, today = todayStr(), wd = (new Date().getDay()+6)%7;
+  var start = addDays(today, -(weeks-1)*7 - wd), g = "", W = weeks*(cell+gap), H = 7*(cell+gap);
+  for(var w=0; w<weeks; w++) for(var d=0; d<7; d++){
+    var day = addDays(start, w*7+d); if(day>today) continue;
+    var l = S.log[day], m = l ? l.min : 0, act = isActiveDay(day);
+    var op = !act ? 0 : m>=30 ? 1 : m>=20 ? .75 : m>=10 ? .5 : .3;
+    g += '<rect x="'+(w*(cell+gap))+'" y="'+(d*(cell+gap))+'" width="'+cell+'" height="'+cell+'" rx="3" fill="'+(act?'var(--accent)':'var(--soft)')+'"'+(act?' fill-opacity="'+op+'"':'')+(day===today?' stroke="var(--brass)" stroke-width="2"':'')+'><title>'+day+(act?' · '+Math.round(m)+' min':' · sin práctica')+'</title></rect>';
+  }
+  return '<svg viewBox="-1 -1 '+(W+2)+' '+(H+2)+'" width="100%" style="max-width:'+(W+2)+'px" role="img" aria-label="Días practicados en las últimas 12 semanas">'+g+'</svg>';
+}
+function minutesChart(){
+  var n = 14, today = todayStr(), Wd = 280, H = 110, mt = 8, mb = 18, bw = Wd/n, max = 30, days = [];
+  for(var i=n-1;i>=0;i--){ var d = addDays(today,-i), l = S.log[d]; days.push({d:d, m:l?l.min:0}); max = Math.max(max, l?l.min:0); }
+  function y(v){ return mt + (H-mt-mb)*(1-v/max); }
+  var g = '<line x1="0" x2="'+Wd+'" y1="'+y(30).toFixed(1)+'" y2="'+y(30).toFixed(1)+'" stroke="var(--brass)" stroke-dasharray="3 3"/><text x="'+Wd+'" y="'+(y(30)-3).toFixed(1)+'" text-anchor="end">30 min</text>';
+  days.forEach(function(o,i){
+    var h = Math.max(o.m>0?2:0, y(0)-y(o.m));
+    g += '<rect x="'+(i*bw+2).toFixed(1)+'" y="'+(y(0)-h).toFixed(1)+'" width="'+(bw-4).toFixed(1)+'" height="'+h.toFixed(1)+'" rx="2" fill="'+(o.m>=30?'var(--ok)':'var(--accent)')+'"><title>'+o.d+' · '+Math.round(o.m)+' min</title></rect>';
+    if(i%7===6 || i===0) g += '<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle">'+(i===n-1?'hoy':o.d.slice(8)+'/'+o.d.slice(5,7))+'</text>';
+  });
+  return '<svg viewBox="0 0 '+Wd+' '+H+'" width="100%" role="img" aria-label="Minutos por día, últimos 14 días">'+g+'</svg>';
+}
+function spark(vals, color){
+  vals = vals.slice(-15);
+  if(vals.length<2) return '<div class="small muted" style="height:30px;display:flex;align-items:center">sin datos aún</div>';
+  var W = 120, H = 30, mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals); if(mx===mn){ mx += 1; mn -= 1; }
+  var pts = vals.map(function(v,i){ return (i*W/(vals.length-1)).toFixed(1)+","+(H-3-(v-mn)/(mx-mn)*(H-6)).toFixed(1); });
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="30" preserveAspectRatio="none" aria-hidden="true"><polyline points="'+pts.join(" ")+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';
+}
+function trend(vals, higherBetter){
+  if(vals.length<6) return "";
+  var a = avg(vals.slice(-3)), b = avg(vals.slice(-6,-3)); if(b===0 && a===0) return "";
+  var up = a > b*1.05, down = a < b*0.95, good = higherBetter ? up : down, bad = higherBetter ? down : up;
+  return good ? '<span class="ok small">mejorando</span>' : bad ? '<span class="bad small">bajando</span>' : '<span class="muted small">estable</span>';
+}
 function renderHoy(){
-  var l = dayLog(), w = weekNum(), ph = phase(), st = streak();
+  var l = dayLog(), w = weekNum(), ph = phase(), st = streak(), pd = practicedDays(), sn = sessionNum();
   var wordsTarget = 2, numsTarget = w>=3 ? 1 : 0, majorTarget = w>=2 ? 20 : 0;
-  var minPct = Math.min(100, Math.round(l.min/30*100));
   var blocks = [];
   var ownPalace = S.palaces.some(function(p){ return p.name.indexOf("(ejemplo)")<0 && p.loci.filter(function(z){return norm(z);}).length>=10; });
   if(w<=2 || !ownPalace) blocks.push({done:ownPalace, t:"Construye tu propio palacio", d: ownPalace ? "Listo. Usa siempre el mismo recorrido." : "10 lugares reales que conozcas de memoria · unos 5 min", prog:"", tab:"palacio"});
   blocks.push({done:l.w>=wordsTarget, t:"Palabras en el palacio", d:"2 rondas · unos 5 min", prog:l.w+" de "+wordsTarget, tab:"palabras"});
   if(majorTarget) blocks.push({done:l.m>=majorTarget, t:"Repaso del sistema mayor", d: majorFilled()<10 ? "Primero llena al menos 10 entradas de tu tabla" : "20 tarjetas · unos 5 min", prog:l.m+" de "+majorTarget, tab:"mayor"});
-  else blocks.push({done:false, t:"Sistema mayor", d:"Toca en la semana 2. Puedes adelantarte y empezar tu tabla.", prog:"", tab:"mayor", locked:true});
+  else blocks.push({done:false, t:"Sistema mayor", d:"Empieza en la semana 2 de práctica. Puedes adelantarte y armar tu tabla.", prog:"", tab:"mayor", locked:true});
   if(numsTarget) blocks.push({done:l.n>=numsTarget, t:"Números", d:"1 ronda · unos 5 min", prog:l.n+" de "+numsTarget, tab:"numeros"});
-  else blocks.push({done:false, t:"Números", d:"Toca en la semana 3. Puedes probar una ronda sin tabla.", prog:"", tab:"numeros", locked:true});
-  blocks.push({done:(l.o||0)>=2, t:"Observador (opcional)", d:"Dos ejercicios de observación o estimación · unos 5 min", prog:(l.o||0)+" de 2", tab:"obs", opt:true});
+  else blocks.push({done:false, t:"Números", d:"Empieza en la semana 3 de práctica. Puedes probar una ronda sin tabla.", prog:"", tab:"numeros", locked:true});
+  blocks.push({done:(l.o||0)>=2, t:"Observador", d:"Opcional · dos ejercicios de observación o estimación", prog:(l.o||0)+" de 2", tab:"obs", opt:true});
   var reqDone = blocks.every(function(b){ return b.locked || b.done || b.opt; });
+  var doneN = blocks.filter(function(b){ return !b.locked && !b.opt && b.done; }).length, reqN = blocks.filter(function(b){ return !b.locked && !b.opt; }).length;
+  var totalMin = 0; for(var dd in S.log) totalMin += S.log[dd].min;
+  var trick = TRICKS[(daysBetween("2026-01-01", todayStr())%TRICKS.length+TRICKS.length)%TRICKS.length];
+  var O = obs(), obsWeek = 0; for(var i=0;i<7;i++){ var lg = S.log[addDays(todayStr(),-i)]; if(lg) obsWeek += lg.o||0; }
 
   var h = '<section class="view">';
   if(!S.seenGuide) h += '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>Primera vez</h3><p>Lee la guía antes de empezar: qué es un palacio de la memoria y cómo se usa. Son unos 5 minutos.</p></div><button class="btn primary" data-go="guia">Leer la guía</button></div></div>';
-  h += '<div class="panel"><div class="daybar">'
-    + '<div class="stat"><h3>Hoy</h3><b class="mono">'+Math.round(l.min)+'<span class="muted small"> / 30 min</span></b><div class="meter"><i style="width:'+minPct+'%"></i></div></div>'
-    + '<div class="stat"><h3>Racha</h3><b class="mono">'+st+'</b><span class="muted small">'+(st===1?"día seguido":"días seguidos")+'</span></div>'
-    + '<div class="stat"><h3>Nivel</h3><b class="mono">'+S.words.level+'</b><span class="muted small">palabras por ronda</span></div>'
-    + '</div></div>';
-  h += '<div class="panel"><div class="phase"><h3>Fase actual</h3><h2>'+esc(ph.t)+'</h2><p class="muted">'+esc(ph.d)+'</p></div></div>';
+
+  h += '<div class="panel hero"><div class="hero-l"><div class="caseno">Sesión N.º '+pad3(sn)+' · semana '+w+'</div><h2>'+greeting()+'</h2><p class="muted">'+esc(longDate())+' · '+(reqDone ? 'lo obligatorio de hoy está hecho' : doneN+' de '+reqN+' tareas hechas')+'</p>'
+    + '<div class="kpis"><div><b class="mono">'+st+'</b><span>'+(st===1?'día de racha':'días de racha')+'</span></div><div><b class="mono">'+pd+'</b><span>días practicados</span></div><div><b class="mono">'+(totalMin>=120 ? (totalMin/60).toFixed(1)+' h' : Math.round(totalMin)+' min')+'</b><span>en total</span></div></div></div>'
+    + '<div class="hero-r">'+ring(l.min, 30)+'</div></div>';
+
   h += '<div class="panel"><h3>Sesión de hoy</h3><div class="blocks">';
   blocks.forEach(function(b){
     h += '<div class="block"><div class="check'+(b.done?' done':'')+'"></div><div><div style="font-weight:600">'+esc(b.t)+'</div><div class="muted small">'+esc(b.d)+(b.prog?' · <span class="mono">'+b.prog+'</span>':'')+'</div></div>'
       + '<button class="btn small'+(b.locked?' ghost':'')+'" data-go="'+b.tab+'">'+(b.locked?'Adelantar':'Ir')+'</button></div>';
   });
-  h += '</div></div>';
-  if(reqDone && l.min < 30){
-    var left = Math.max(1, Math.round(30 - l.min));
-    h += '<div class="panel"><div class="phase"><h3>Lo obligatorio está hecho</h3><h2>Te quedan unos '+left+' min opcionales</h2>'
-      + '<p class="muted">Puedes cerrar aquí y el día cuenta para la racha. Si quieres usar el resto, en este orden rinde más:</p></div>'
-      + '<div class="blocks">'
-      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Más rondas de palabras</div><div class="muted small">Cada ronda extra puede subirte de nivel. Prueba bajar a 6 segundos por estación.</div></div><button class="btn small" data-go="palabras">Ir</button></div>'
-      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Repasa el palacio sin la app</div><div class="muted small">Cierra los ojos y recorre los lugares en orden, ida y vuelta. Lugares nítidos dan imágenes firmes.</div></div><button class="btn small" data-go="palacio">Ver</button></div>'
-      + '<div class="block"><div class="check"></div><div><div style="font-weight:600">Adelanta tu tabla del sistema mayor</div><div class="muted small">Escribe palabras del 00 al 09. Es la tarea que más tiempo pide después.</div></div><button class="btn small" data-go="mayor">Ir</button></div>'
-      + '</div></div>';
-  } else if(reqDone){
-    h += '<div class="panel"><div class="phase"><h3>Sesión completa</h3><h2>30 minutos hechos</h2><p class="muted">Mañana sigue. La constancia diaria pesa más que las sesiones largas.</p></div></div>';
-  }
-  h += '<div class="panel"><h3>Por qué funciona</h3><p class="small muted">En el estudio de Dresler (Neuron, 2017), personas sin experiencia que entrenaron el método de loci unos 30 minutos al día durante 6 semanas pasaron de recordar unas 26 palabras a más de 60, y lo mantuvieron meses después. Este plan sigue esa estructura.</p></div>';
+  h += '</div>';
+  if(reqDone && l.min<30) h += '<p class="small muted">Puedes cerrar aquí y el día cuenta. Si te sobran unos '+Math.max(1,Math.round(30-l.min))+' minutos, rinde más otra ronda de palabras, un repaso del palacio con los ojos cerrados o un par de ejercicios del Observador.</p>';
+  h += '</div>';
+
+  h += '<div class="grid2"><div class="panel"><h3>Mapa de práctica</h3>'+heatmap()+'<p class="small muted">Últimas 12 semanas, de lunes a domingo. Más intenso cuanto más cerca de los 30 minutos.</p></div>'
+    + '<div class="panel"><h3>Minutos por día</h3>'+minutesChart()+'</div></div>';
+
+  var wh = S.words.hist.map(function(x){ return x.ok; }), nh = S.nums.hist.map(function(x){ return x.ok; });
+  var ch = O.clock.hist.concat(O.flash.hist).sort(function(a,b){ return a.ts-b.ts; }).map(function(x){ return x.err; });
+  var due = dueList().length;
+  h += '<div class="panel"><h3>Habilidades</h3><div class="skills">'
+    + '<button class="skill" data-go="palabras"><span class="sk-t">Palabras</span><b class="mono">'+S.words.level+'</b><span class="sk-s">por ronda · '+trend(wh,true)+'</span>'+spark(wh,"var(--accent)")+'</button>'
+    + '<button class="skill" data-go="numeros"><span class="sk-t">Números</span><b class="mono">'+S.nums.level+'</b><span class="sk-s">dígitos · '+trend(nh,true)+'</span>'+spark(nh,"var(--brass)")+'</button>'
+    + '<button class="skill" data-go="mayor"><span class="sk-t">Sistema mayor</span><b class="mono">'+majorFilled()+'<span class="muted small"> / 100</span></b><span class="sk-s">'+due+' tarjeta'+(due===1?'':'s')+' pendiente'+(due===1?'':'s')+'</span><div class="meter" style="margin-top:12px"><i style="width:'+majorFilled()+'%"></i></div></button>'
+    + '<button class="skill" data-go="obs"><span class="sk-t">Observador</span><b class="mono">'+obsWeek+'</b><span class="sk-s">ejercicios esta semana · '+trend(ch,false)+'</span>'+spark(ch,"var(--ok)")+'</button>'
+    + '</div></div>';
+
+  h += '<div class="grid2"><div class="panel"><div class="phase"><h3>Fase actual</h3><h2 style="font-size:1.1rem">'+esc(ph.t)+'</h2><p class="muted small">'+esc(ph.d)+'</p></div></div>'
+    + '<div class="panel"><div class="phase" style="border-color:var(--accent)"><h3>Truco del día</h3><h2 style="font-size:1.1rem">'+esc(trick[0])+'</h2><p class="muted small">'+esc(trick[1])+'</p></div></div></div>';
+
+  h += '<p class="small muted" style="padding:0 4px">Basado en Dresler y colaboradores (Neuron, 2017): 30 minutos diarios durante 6 semanas llevaron a principiantes de unas 26 a más de 60 palabras recordadas. <a href="#" data-go="guia" data-anchor="g-fuentes" style="color:var(--accent)">Ver todas las fuentes</a>.</p>';
   h += '</section>';
   view.innerHTML = h;
-  view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ go(b.getAttribute("data-go")); }; });
+  view.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(e){ e.preventDefault(); var a = b.getAttribute("data-anchor"); go(b.getAttribute("data-go")); if(a){ var t = document.getElementById(a); if(t) t.scrollIntoView({block:"start"}); } }; });
 }
 
 /* ---------- PALACIO ---------- */
